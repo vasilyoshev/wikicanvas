@@ -24,7 +24,7 @@ android/
 .superpowers/
 
 # tests
-coverage/
+coverage/*
 !coverage/baseline.json
 test-results/
 playwright-report/
