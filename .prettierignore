@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+dist-e2e/
+build/
+web-build/
+.secrets/
+android/
+ios/
+supabase/.temp/
+.claude/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+expo-env.d.ts
+public/canvaskit.wasm
