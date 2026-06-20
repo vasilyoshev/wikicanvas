@@ -684,7 +684,7 @@ Commit trailer on every commit: "Co-Authored-By: Claude Opus 4.8 <noreply@anthro
   .superpowers/
 
   # tests
-  coverage/
+  coverage/*
   !coverage/baseline.json
   test-results/
   playwright-report/
