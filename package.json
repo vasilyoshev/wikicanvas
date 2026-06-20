@@ -30,7 +30,8 @@
     "db:stop": "npm exec supabase -- stop",
     "db:status": "npm exec supabase -- status",
     "db:push:prod": "npm exec supabase -- db push --linked",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/noto-sans": "^0.4.2",
@@ -87,6 +88,7 @@
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.1.0",
+    "babel-preset-expo": "^56.0.15",
     "canvaskit-wasm": "^0.40.0",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~10.0.0",
@@ -94,6 +96,7 @@
     "husky": "^9.1.7",
     "jest-expo": "~54.0.17",
     "lint-staged": "^17.0.2",
+    "patch-package": "^8.0.1",
     "prettier": "^3.8.3",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"

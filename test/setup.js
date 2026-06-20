@@ -7,6 +7,7 @@ jest.mock(
   "react-native-safe-area-context",
   () => require("react-native-safe-area-context/jest/mock").default,
 );
+
 jest.mock("@rn-primitives/slot", () => ({
   Slot: require("react-native").Text,
 }));
