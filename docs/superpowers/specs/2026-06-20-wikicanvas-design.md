@@ -40,7 +40,10 @@ domain code is part of WikiCanvas.
 
 ### Out of scope for v1
 Notes, reading queue, topic suggestions, auto-capture of real browsing,
-minimaps, collaboration/sharing.
+minimaps, collaboration/sharing. Also deferred: deleting an individual window
+(node) — the session is the unit of deletion in v1; edges cascade with their
+nodes/session at the schema level so integrity holds when node-delete lands
+later.
 
 ## 3. Key decisions (with rationale)
 
@@ -132,11 +135,17 @@ RLS on all: `FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK
   `article_title` text, `lang` text, `x` real, `y` real, `width` real,
   `height` real, `parent_node_id` uuid null (null = root), `created_at` timestamptz.
 - **edge**: `id` uuid pk, `session_id` uuid fk → session (on delete cascade),
-  `source_node_id` uuid, `target_node_id` uuid, `clicked_link_text` text null,
+  `source_node_id` uuid fk → node (on delete cascade), `target_node_id` uuid
+  fk → node (on delete cascade), `clicked_link_text` text null,
   `created_at` timestamptz.
 
 `deleted_at` on session is a soft-delete tombstone so deletes propagate across
 devices under LWW instead of being resurrected by an older remote copy.
+
+**`updated_at` is the LWW clock.** Any mutation of a session's nodes or edges
+(spawn, drag, resize, edge add, soft-delete) bumps the parent
+`session.updated_at`. Nodes/edges have no independent `updated_at` because the
+session is the atomic sync unit (§9).
 
 ### Local store
 A `LocalStore` interface with the **exact same row shape** so sync is a straight
