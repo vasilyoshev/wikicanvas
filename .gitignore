@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# expo / metro
+.expo/
+dist/
+web-build/
+
+# native
+ios/
+android/
+*.orig.*
+
+# env
+.env
+.env.local
+.env*.local
+
+# misc
+.DS_Store
+*.log
+.superpowers/
+
+# tests
+coverage/
+test-results/
+playwright-report/
