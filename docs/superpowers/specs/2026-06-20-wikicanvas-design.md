@@ -7,8 +7,8 @@ Author: Vasil Yoshev (with Claude)
 ## 1. Product
 
 WikiCanvas is an infinite, pannable/zoomable canvas where each node is a live,
-scrollable window showing a real Wikipedia article. A user starts a *session*
-from one article. Clicking an internal link *inside* a window spawns a new
+scrollable window showing a real Wikipedia article. A user starts a _session_
+from one article. Clicking an internal link _inside_ a window spawns a new
 connected window for the target article and draws an edge from source → target
 (parent → child). Over a session this builds a visual map of an exploration
 path — think tldraw/Miro, but the cards are real Wikipedia content. A sessions
@@ -22,6 +22,7 @@ domain code is part of WikiCanvas.
 ## 2. Goals and non-goals
 
 ### v1 scope (build only this)
+
 1. Sessions list: create / open / rename / delete. Each session stores its
    canvas (nodes + edges + positions/sizes + viewport).
 2. Canvas screen: infinite pan/zoom board.
@@ -39,6 +40,7 @@ domain code is part of WikiCanvas.
    CC BY-SA license is named in the fullscreen reading view. (See §7.)
 
 ### Out of scope for v1
+
 Notes, reading queue, topic suggestions, auto-capture of real browsing,
 minimaps, collaboration/sharing. Also deferred: deleting an individual window
 (node) — the session is the unit of deletion in v1; edges cascade with their
@@ -47,23 +49,24 @@ later.
 
 ## 3. Key decisions (with rationale)
 
-| Decision | Choice | Rationale |
-|---|---|---|
-| Repo strategy | Fresh git repo at `C:\Users\vasil\Projects\WikiCanvas`, **porting Selftend's infrastructure only** (never copy domain code) | Cleaner than copy-then-strip; nothing to delete; Selftend stays an untouched reference. |
-| Backend | **New Supabase project** | Only WikiCanvas tables; simplest RLS; clean migration history from v1; nothing to ignore. |
-| App name | **WikiCanvas** | Slug `wikicanvas`, scheme `wikicanvas`, bundle `org.vasilyoshev.wikicanvas`. |
-| Canvas tech | **Unified React Native canvas** (`react-native-skia` + `react-native-gesture-handler` + `react-native-reanimated`) | One implementation runs on web (Skia via CanvasKit/WASM) and native; no throwaway web-only renderer. React Flow was rejected because it is web/DOM-only and would force a second native renderer. |
-| Wikipedia fetch | **Supabase Edge Function proxy** (`wiki-proxy`, Deno) | Browsers cannot set a `User-Agent` (Wikimedia requires one) and CORS on the API is not guaranteed, so direct client fetch is both non-compliant and fragile. The proxy sets the UA, normalizes CORS, and centralizes caching. Co-located with the backend; reusable by native. |
-| HTML endpoint | MediaWiki REST API `GET https://{lang}.wikipedia.org/w/rest.php/v1/page/{title}/with_html` | Current recommended path; the legacy REST API and the Core REST API are both flagged for deprecation (Core: "gradual deprecation starting July 2026"). `with_html` returns the canonical title + license metadata alongside the body. |
-| HTML isolation | Sandboxed `<iframe srcdoc sandbox="allow-scripts">` on web; `react-native-webview` on native | Null-origin iframe cannot reach the app/cookies/storage, yet still runs our injected interceptor — strong isolation *and* link interception in one mechanism. Shadow DOM scopes CSS but leaks and does not sandbox scripts. |
-| Auth | **Optional.** Sessions list + canvas are public routes; sign-in only enables sync | The product is local-first/no-login. (Selftend gated all routes behind auth + email-verify + consent + onboarding; that gate is removed.) |
-| Field encryption | **Dropped** | Selftend encrypts at rest because it stores health data. WikiCanvas data is public article titles + canvas coordinates — non-sensitive. Standard RLS suffices. |
-| Sync conflict model | **Session-level last-write-wins** by `updated_at` | A session (with its nodes/edges) is the atomic unit; simple, fully unit-testable, fine for single-user multi-device. |
-| Native scope in v1 | **Full cross-platform** via the unified canvas | User chose cross-platform now; the unified Skia canvas makes it one codebase. Develop web-first, then enable/tune native. |
+| Decision            | Choice                                                                                                                      | Rationale                                                                                                                                                                                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Repo strategy       | Fresh git repo at `C:\Users\vasil\Projects\WikiCanvas`, **porting Selftend's infrastructure only** (never copy domain code) | Cleaner than copy-then-strip; nothing to delete; Selftend stays an untouched reference.                                                                                                                                                                                        |
+| Backend             | **New Supabase project**                                                                                                    | Only WikiCanvas tables; simplest RLS; clean migration history from v1; nothing to ignore.                                                                                                                                                                                      |
+| App name            | **WikiCanvas**                                                                                                              | Slug `wikicanvas`, scheme `wikicanvas`, bundle `org.vasilyoshev.wikicanvas`.                                                                                                                                                                                                   |
+| Canvas tech         | **Unified React Native canvas** (`react-native-skia` + `react-native-gesture-handler` + `react-native-reanimated`)          | One implementation runs on web (Skia via CanvasKit/WASM) and native; no throwaway web-only renderer. React Flow was rejected because it is web/DOM-only and would force a second native renderer.                                                                              |
+| Wikipedia fetch     | **Supabase Edge Function proxy** (`wiki-proxy`, Deno)                                                                       | Browsers cannot set a `User-Agent` (Wikimedia requires one) and CORS on the API is not guaranteed, so direct client fetch is both non-compliant and fragile. The proxy sets the UA, normalizes CORS, and centralizes caching. Co-located with the backend; reusable by native. |
+| HTML endpoint       | MediaWiki REST API `GET https://{lang}.wikipedia.org/w/rest.php/v1/page/{title}/with_html`                                  | Current recommended path; the legacy REST API and the Core REST API are both flagged for deprecation (Core: "gradual deprecation starting July 2026"). `with_html` returns the canonical title + license metadata alongside the body.                                          |
+| HTML isolation      | Sandboxed `<iframe srcdoc sandbox="allow-scripts">` on web; `react-native-webview` on native                                | Null-origin iframe cannot reach the app/cookies/storage, yet still runs our injected interceptor — strong isolation _and_ link interception in one mechanism. Shadow DOM scopes CSS but leaks and does not sandbox scripts.                                                    |
+| Auth                | **Optional.** Sessions list + canvas are public routes; sign-in only enables sync                                           | The product is local-first/no-login. (Selftend gated all routes behind auth + email-verify + consent + onboarding; that gate is removed.)                                                                                                                                      |
+| Field encryption    | **Dropped**                                                                                                                 | Selftend encrypts at rest because it stores health data. WikiCanvas data is public article titles + canvas coordinates — non-sensitive. Standard RLS suffices.                                                                                                                 |
+| Sync conflict model | **Session-level last-write-wins** by `updated_at`                                                                           | A session (with its nodes/edges) is the atomic unit; simple, fully unit-testable, fine for single-user multi-device.                                                                                                                                                           |
+| Native scope in v1  | **Full cross-platform** via the unified canvas                                                                              | User chose cross-platform now; the unified Skia canvas makes it one codebase. Develop web-first, then enable/tune native.                                                                                                                                                      |
 
 ## 4. Architecture
 
 ### Layers (top to bottom)
+
 - **Screens** (`app/`): thin expo-router route files — sessions list, canvas.
 - **Canvas** (`src/features/canvas`): Skia board, node/edge rendering,
   gesture-driven pan/zoom, viewport state, node virtualization.
@@ -74,6 +77,7 @@ later.
 - **External**: Wikipedia, reached only through the `wiki-proxy` Edge Function.
 
 ### Platform split points (only two)
+
 1. `ArticleHtml` — `ArticleHtml.tsx` (iframe) vs `ArticleHtml.native.tsx`
    (`react-native-webview`); Metro picks per platform.
 2. `LocalStore` adapter — IndexedDB vs SQLite.
@@ -83,6 +87,7 @@ Everything else (canvas, window chrome, all logic, sync) is shared code.
 experimental with production-render bugs and per-instance WebView overhead.
 
 ### Link-spawn data flow
+
 Click inside window → injected interceptor classifies the link →
 `postMessage({type, lang, title, text})` to the canvas → handler resolves the
 title → `wikipedia.getArticle()` (cache → proxy) → create node + edge in
@@ -92,6 +97,7 @@ edge → (if signed in) debounced background sync pushes the change.
 ## 5. Repo and scaffolding plan
 
 ### Ported (infrastructure)
+
 Supabase client (`src/lib/supabase.ts`), env (`src/lib/env.ts`), secure-store
 adapter, providers (session, app-providers, i18n), `(auth)/*` +
 `src/features/auth` (Google sign-in), app-shell chrome + `react-native-reusables`
@@ -102,10 +108,12 @@ husky/eslint/prettier), and i18n scaffolding (keep `common`/`auth`/`errors`/
 `navigation` namespaces; drop domain namespaces).
 
 ### Left behind (domain — never ported)
+
 `app/(app)/modules`, `app/(app)/tools`, `src/features/{cbt,act,meditation,mood,
 journal,gratitude,...}`, domain i18n/assets, all domain migrations.
 
 ### Structural changes
+
 - **Auth optional**: remove the `ProtectedLayout` gate; sessions list + canvas
   are public; sign-in is an optional "enable sync" action reusing `(auth)`.
 - **Drop field-level encryption** machinery entirely.
@@ -116,6 +124,7 @@ journal,gratitude,...}`, domain i18n/assets, all domain migrations.
   `coverage/baseline.json` to the new, smaller codebase.
 
 ### New structure
+
 `src/features/{wikipedia,sessions,sync,canvas}`,
 `supabase/functions/wiki-proxy/`, fresh `supabase/migrations/` from v1,
 `app/(app)/index.tsx` → sessions list, `app/(app)/canvas/[sessionId].tsx` →
@@ -124,6 +133,7 @@ canvas.
 ## 6. Data model
 
 ### Supabase tables
+
 RLS on all: `FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK
 (auth.uid() = user_id)`. One timestamped migration matching the repo convention
 (`YYYYMMDDHHMMSS_initial_wikicanvas.sql`).
@@ -148,12 +158,14 @@ devices under LWW instead of being resurrected by an older remote copy.
 session is the atomic sync unit (§9).
 
 ### Local store
+
 A `LocalStore` interface with the **exact same row shape** so sync is a straight
 upsert (no transform). Web → IndexedDB (via the small `idb` wrapper); native →
 `expo-sqlite`. Collections/tables: `sessions`, `nodes`, `edges`,
 `article_cache`. Anonymous data stored with `user_id = null`.
 
 ### Article cache
+
 `article_cache` keyed by `lang:title`: `{ html, canonicalTitle, fetchedAt,
 etag }`. 24h TTL with ETag revalidation. An in-memory in-flight `Map` de-dupes
 concurrent requests for the same title.
@@ -161,13 +173,16 @@ concurrent requests for the same title.
 ## 7. Wikipedia integration
 
 ### Endpoint
+
 `GET https://{lang}.wikipedia.org/w/rest.php/v1/page/{title}/with_html` → JSON
 `{ title (canonical), key, html (Parsoid), license, ... }`. Chosen over bare
 `/html` because canonical title + license arrive in one call (needed for
 attribution + de-dupe).
 
 ### `wiki-proxy` Edge Function (Deno)
+
 `GET /wiki-proxy?lang=en&title=…` plus a `search` mode. Responsibilities:
+
 - Sets compliant `User-Agent` and `Api-User-Agent`:
   `WikiCanvas/1.0 (https://github.com/vasilyoshev/wikicanvas; vasil.yoshev@gmail.com)`.
 - Forwards `ETag`/`If-None-Match` for 304 revalidation; passes through
@@ -178,6 +193,7 @@ attribution + de-dupe).
   re-hits a cached title).
 
 ### Isolation + interception
+
 - **Web**: `<iframe srcdoc sandbox="allow-scripts">` (no `allow-same-origin`).
   Injected into `srcdoc`: a `<base href="https://{lang}.wikipedia.org/">`, a
   width-constraining readable stylesheet, and the interceptor script.
@@ -194,7 +210,9 @@ attribution + de-dupe).
   inert — acceptable for a read view; minimal CSS renders collapsibles expanded.
 
 ### Link classification & title resolution — `src/features/wikipedia/links.ts`
+
 Pure module, **heavily unit-tested** (required tests).
+
 - **Spawns an article node only if** the href resolves to a same-wiki
   `/wiki/{Title}` in the **main namespace** — excluding `File:`/`Special:`/
   `Help:`/`Talk:`/`Category:`/`Wikipedia:`/`Portal:`/`Template:`/`User:`/
@@ -210,19 +228,21 @@ Pure module, **heavily unit-tested** (required tests).
   cross-language is a clean future addition; interlanguage links do not spawn).
 
 ### Starting a session
+
 `searchTitles(q)` → `/w/rest.php/v1/search/title?q=…&limit=10` through the proxy
 for search-as-you-type; also accepts a pasted Wikipedia URL/title.
 
 ## 8. UI
 
 ### Article window (node)
+
 - **Header chrome (always visible)**: Wikipedia mark · title · fullscreen
   toggle (`ti-maximize`) · close. The Wikipedia mark is tappable to the source.
 - **Body**: rendered article HTML, scrollable inside the window.
 - **Attribution**:
-  - *Canvas card*: the tiny Wikipedia mark in the header (tappable to source) is
+  - _Canvas card_: the tiny Wikipedia mark in the header (tappable to source) is
     the whole attribution on the card — no footer bar.
-  - *Fullscreen*: a normal end-of-content footer names the license —
+  - _Fullscreen_: a normal end-of-content footer names the license —
     `Content from Wikipedia, licensed CC BY-SA 4.0 · View original`.
   - Rationale: CC BY-SA requires attribution "in any reasonable manner based on
     the medium"; the card carries a source mark/link that travels with the
@@ -232,6 +252,7 @@ for search-as-you-type; also accepts a pasted Wikipedia URL/title.
     displays the full article, not a thumbnail.)
 
 ### Canvas
+
 - Pan: drag empty canvas. Zoom: scroll/pinch + `−/100%/+`, bounded min/max,
   plus fit-to-content.
 - **Spawn placement**: new window to the right of its source, nudged down only
@@ -247,9 +268,10 @@ for search-as-you-type; also accepts a pasted Wikipedia URL/title.
   their iframe/WebView; off-screen windows render as lightweight placeholders.
 
 ### Sessions list (home)
+
 - Header: "Your sessions" + an optional **Sign in to sync** button.
 - Grid of session cards: mini canvas-preview thumbnail, title, `N windows ·
-  edited …`, and a `⋯` menu (open / rename / delete).
+edited …`, and a `⋯` menu (open / rename / delete).
 - A **New session** card launches article search to pick a starting point.
 - Empty/anonymous state works fully without login.
 
@@ -286,6 +308,7 @@ for search-as-you-type; also accepts a pasted Wikipedia URL/title.
 - Reset `coverage/baseline.json` after the initial scaffold.
 
 ## 11. Incremental build sequence
+
 Each step ends by running typecheck/lint/tests and reporting status.
 
 1. **Scaffold + rename** — port infra, omit domain, rebrand, make auth optional,
@@ -293,8 +316,8 @@ Each step ends by running typecheck/lint/tests and reporting status.
 2. **Data model** — new Supabase project + migration; `LocalStore`
    (IndexedDB/SQLite) + types + repo; mapping tests.
 3. **One static window** — `wiki-proxy` + wikipedia client (fetch/cache/de-dupe)
-   + `links.ts` (+ full tests); render a single article window (iframe/WebView)
-   with attribution. No canvas yet.
+   - `links.ts` (+ full tests); render a single article window (iframe/WebView)
+     with attribution. No canvas yet.
 4. **Canvas** — Skia + gestures + reanimated: pan/zoom, viewport persistence,
    multiple windows, drag/resize. Web first, then verify native.
 5. **Link-spawning + edges** — interceptor + postMessage both platforms, spawn
@@ -304,12 +327,14 @@ Each step ends by running typecheck/lint/tests and reporting status.
    push/pull.
 
 ## 12. Assumptions to confirm
+
 - **User-Agent contact**: `vasil.yoshev@gmail.com` + repo URL
   `https://github.com/vasilyoshev/wikicanvas` (placeholder — adjust if the repo
   lands elsewhere).
 - Bundle org `org.vasilyoshev.*` carried over from Selftend.
 
 ## 13. References (verified 2026-06-20)
+
 - Wikimedia API deprecation (Core REST gradual deprecation from July 2026):
   https://wikitech.wikimedia.org/wiki/API_Portal/Deprecation
 - MediaWiki REST API changelog: https://www.mediawiki.org/wiki/API:REST_API/Changelog
