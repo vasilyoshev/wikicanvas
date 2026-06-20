@@ -5,6 +5,10 @@ module.exports = {
   setupFilesAfterEnv: ["<rootDir>/test/setup.js"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    // @expo/vector-icons requires expo-asset + expo-font (not available in Jest).
+    // The manual mock in __mocks__/@expo/vector-icons/ renders a plain RN Text
+    // so component tests that import Icon can run without a full Expo font stack.
+    "^@expo/vector-icons/MaterialIcons$": "<rootDir>/__mocks__/@expo/vector-icons/MaterialIcons.js",
   },
   testPathIgnorePatterns: [
     "/node_modules/",
