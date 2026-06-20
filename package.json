@@ -12,7 +12,7 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "export:web": "npm run setup:skia-web && npm exec expo -- export --platform web --clear",
-    "setup:skia-web": "node -e \"require('@shopify/react-native-skia/scripts/setup-canvaskit')\" || npx setup-skia-web public",
+    "setup:skia-web": "node node_modules/@shopify/react-native-skia/scripts/setup-canvaskit.js public",
     "serve:web:production": "npm exec expo -- serve",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
