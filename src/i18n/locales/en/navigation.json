@@ -1,0 +1,10 @@
+{
+  "appName": "WikiCanvas",
+  "notFound": {
+    "title": "Page not found",
+    "home": "Home"
+  },
+  "header": {
+    "goHome": "Go to home"
+  }
+}

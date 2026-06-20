@@ -1,0 +1,10 @@
+{
+  "appName": "WikiCanvas",
+  "notFound": {
+    "title": "Страницата не е намерена",
+    "home": "Начало"
+  },
+  "header": {
+    "goHome": "Към началото"
+  }
+}

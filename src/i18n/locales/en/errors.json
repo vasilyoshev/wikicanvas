@@ -1,0 +1,8 @@
+{
+  "fallback": {
+    "title": "Something went wrong",
+    "description": "The app hit an unexpected problem.",
+    "retry": "Retry",
+    "home": "Go to start"
+  }
+}
