@@ -74,7 +74,11 @@ export default function SessionsListScreen() {
   const sessions = summaries ?? [];
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView
+      testID="sessions-list-screen"
+      className="flex-1 bg-background"
+      edges={["top", "bottom", "left", "right"]}
+    >
       <ScrollView contentContainerClassName="grow gap-6 p-4">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-2xl font-bold">Your sessions</Text>
