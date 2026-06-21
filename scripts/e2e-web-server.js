@@ -30,7 +30,10 @@ const OUTPUT_DIR = "dist-e2e";
 const LOCAL_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 
-const expoBin = path.join(process.cwd(), "node_modules", ".bin", "expo");
+// On Windows the local binary is `expo.cmd`; modern Node also requires shell:true
+// to spawn a .cmd. Resolve the right name per platform and spawn via the shell.
+const isWindows = process.platform === "win32";
+const expoBin = path.join(process.cwd(), "node_modules", ".bin", isWindows ? "expo.cmd" : "expo");
 
 const buildEnv = {
   ...process.env,
@@ -49,10 +52,15 @@ if (skipBuild) {
   console.log(`[e2e-web] E2E_SKIP_BUILD=1 - serving existing ${OUTPUT_DIR}/`);
 } else {
   console.log(`[e2e-web] building static web export → ${OUTPUT_DIR}/ (port ${PORT})...`);
-  const build = spawnSync(expoBin, ["export", "--platform", "web", "--output-dir", OUTPUT_DIR], {
-    stdio: "inherit",
-    env: buildEnv,
-  });
+  const build = spawnSync(
+    `"${expoBin}"`,
+    ["export", "--platform", "web", "--output-dir", OUTPUT_DIR],
+    {
+      stdio: "inherit",
+      env: buildEnv,
+      shell: true,
+    },
+  );
   if (build.status !== 0) {
     console.error(`[e2e-web] export failed (exit ${build.status})`);
     process.exit(build.status ?? 1);
