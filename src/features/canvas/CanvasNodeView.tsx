@@ -117,6 +117,16 @@ export function CanvasNodeView({
       style={{ position: "absolute", left: tl.x, top: tl.y, width, height }}
       className={`overflow-hidden rounded-lg bg-card ${borderClass}`}
     >
+      {/* Stable title testID for e2e — always rendered so tests can count windows by title.
+          Sized 1×1 and fully transparent so it's detectable by Playwright but invisible to users. */}
+      <Text
+        testID={`canvas-node-title-${node.articleTitle}`}
+        accessible={false}
+        style={{ position: "absolute", opacity: 0, width: 1, height: 1, overflow: "hidden" }}
+      >
+        {node.articleTitle}
+      </Text>
+
       {/* Drag handle strip across the top so window chrome stays interactive. */}
       <GestureDetector gesture={dragGesture}>
         <Pressable

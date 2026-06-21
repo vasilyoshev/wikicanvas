@@ -237,6 +237,15 @@ export function CanvasBoard({
               ))}
             </Group>
           </Canvas>
+          {/* DOM overlays for e2e: one per edge so Playwright can count edges via testID. */}
+          {edgeViews.map((ev) => (
+            <View
+              key={`edge-overlay-${ev.id}`}
+              testID="canvas-edge"
+              pointerEvents="none"
+              style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+            />
+          ))}
           {renderNodes.map((node) => (
             <CanvasNodeView
               key={node.id}
