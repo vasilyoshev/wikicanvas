@@ -43,6 +43,7 @@ export default function ArticleHtml({ html, lang, nodeId, title, onMessage }: Ar
   return (
     <iframe
       ref={iframeRef}
+      data-testid={`article-frame-${nodeId}`}
       title={title ?? "Wikipedia article"}
       srcDoc={srcDoc}
       sandbox="allow-scripts"
