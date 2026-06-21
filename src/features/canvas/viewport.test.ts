@@ -5,6 +5,7 @@ import {
   clampZoom,
   screenToWorld,
   worldToScreen,
+  zoomAt,
 } from "@/src/features/canvas/viewport";
 
 describe("clampZoom", () => {
@@ -59,5 +60,31 @@ describe("screenToWorld / worldToScreen", () => {
   it("worldToScreen maps the viewport world origin to screen origin", () => {
     const vp = { x: 100, y: 50, zoom: 2 };
     expect(worldToScreen({ x: 100, y: 50 }, vp)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("zoomAt", () => {
+  it("keeps the focus screen point over the same world point", () => {
+    const vp = { x: 0, y: 0, zoom: 1 };
+    const focus = { x: 200, y: 100 };
+    const next = zoomAt(vp, focus, 2);
+    expect(next.zoom).toBe(2);
+    // The world point under `focus` before and after must be identical.
+    expect(screenToWorld(focus, vp)).toEqual(screenToWorld(focus, next));
+  });
+
+  it("clamps the requested zoom", () => {
+    const vp = { x: 0, y: 0, zoom: 1 };
+    const next = zoomAt(vp, { x: 0, y: 0 }, 999);
+    expect(next.zoom).toBe(MAX_ZOOM);
+  });
+
+  it("is a no-op in world position when zooming at the screen origin", () => {
+    const vp = { x: 40, y: 20, zoom: 1 };
+    const next = zoomAt(vp, { x: 0, y: 0 }, 2);
+    // Screen origin maps to viewport.x/y at any zoom, so x/y are unchanged.
+    expect(next.x).toBeCloseTo(40, 6);
+    expect(next.y).toBeCloseTo(20, 6);
+    expect(next.zoom).toBe(2);
   });
 });

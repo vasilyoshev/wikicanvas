@@ -49,3 +49,23 @@ export function worldToScreen(
     y: (world.y - viewport.y) * viewport.zoom,
   };
 }
+
+/**
+ * Zoom to `nextZoom` (clamped) keeping the world point currently under
+ * `focusScreen` fixed on screen.
+ */
+export function zoomAt(
+  viewport: Viewport,
+  focusScreen: { x: number; y: number },
+  nextZoom: number,
+): Viewport {
+  const zoom = clampZoom(nextZoom);
+  // World point under the focus before the zoom.
+  const worldFocus = screenToWorld(focusScreen, viewport);
+  // Solve for new x/y so worldToScreen(worldFocus, next) === focusScreen.
+  return {
+    zoom,
+    x: worldFocus.x - focusScreen.x / zoom,
+    y: worldFocus.y - focusScreen.y / zoom,
+  };
+}
