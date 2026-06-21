@@ -50,6 +50,43 @@ export function worldToScreen(
   };
 }
 
+/** Compute the union bounds of a non-empty list of rects. */
+function unionBounds(bounds: NodeBounds[]): NodeBounds {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const b of bounds) {
+    minX = Math.min(minX, b.x);
+    minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.width);
+    maxY = Math.max(maxY, b.y + b.height);
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+/** Compute a viewport that fits all bounds within the screen, centered. */
+export function fitToContent(
+  bounds: NodeBounds[],
+  screen: { width: number; height: number },
+  padding = 48,
+): Viewport {
+  if (bounds.length === 0) return { x: 0, y: 0, zoom: 1 };
+  const u = unionBounds(bounds);
+  const availW = Math.max(1, screen.width - padding * 2);
+  const availH = Math.max(1, screen.height - padding * 2);
+  const fitW = u.width > 0 ? availW / u.width : MAX_ZOOM;
+  const fitH = u.height > 0 ? availH / u.height : MAX_ZOOM;
+  const zoom = clampZoom(Math.min(fitW, fitH));
+  const center = boundsCenter(u);
+  // Place the content center at the screen center.
+  return {
+    zoom,
+    x: center.x - screen.width / 2 / zoom,
+    y: center.y - screen.height / 2 / zoom,
+  };
+}
+
 /**
  * Zoom to `nextZoom` (clamped) keeping the world point currently under
  * `focusScreen` fixed on screen.

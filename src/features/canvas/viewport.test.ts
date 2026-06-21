@@ -6,6 +6,7 @@ import {
   screenToWorld,
   worldToScreen,
   zoomAt,
+  fitToContent,
 } from "@/src/features/canvas/viewport";
 
 describe("clampZoom", () => {
@@ -86,5 +87,44 @@ describe("zoomAt", () => {
     expect(next.x).toBeCloseTo(40, 6);
     expect(next.y).toBeCloseTo(20, 6);
     expect(next.zoom).toBe(2);
+  });
+});
+
+describe("fitToContent", () => {
+  const screen = { width: 800, height: 600 };
+
+  it("returns identity viewport for empty bounds", () => {
+    expect(fitToContent([], screen)).toEqual({ x: 0, y: 0, zoom: 1 });
+  });
+
+  it("centers a single rect and clamps zoom to MAX for tiny content", () => {
+    const vp = fitToContent([{ x: 0, y: 0, width: 10, height: 10 }], screen);
+    expect(vp.zoom).toBe(MAX_ZOOM);
+    // The rect center should map to the screen center.
+    const centerScreen = worldToScreen({ x: 5, y: 5 }, vp);
+    expect(centerScreen.x).toBeCloseTo(400, 4);
+    expect(centerScreen.y).toBeCloseTo(300, 4);
+  });
+
+  it("fits oversized content by zooming out (within MIN_ZOOM)", () => {
+    const vp = fitToContent([{ x: 0, y: 0, width: 10000, height: 10000 }], screen, 0);
+    expect(vp.zoom).toBeLessThan(1);
+    expect(vp.zoom).toBeGreaterThanOrEqual(MIN_ZOOM);
+  });
+
+  it("encloses every rect within the screen at the computed zoom", () => {
+    const bounds = [
+      { x: 0, y: 0, width: 100, height: 100 },
+      { x: 500, y: 300, width: 100, height: 100 },
+    ];
+    const vp = fitToContent(bounds, screen, 20);
+    for (const b of bounds) {
+      const tl = worldToScreen({ x: b.x, y: b.y }, vp);
+      const br = worldToScreen({ x: b.x + b.width, y: b.y + b.height }, vp);
+      expect(tl.x).toBeGreaterThanOrEqual(-0.001);
+      expect(tl.y).toBeGreaterThanOrEqual(-0.001);
+      expect(br.x).toBeLessThanOrEqual(screen.width + 0.001);
+      expect(br.y).toBeLessThanOrEqual(screen.height + 0.001);
+    }
   });
 });
