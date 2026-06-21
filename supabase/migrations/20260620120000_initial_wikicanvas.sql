@@ -57,7 +57,7 @@ create policy "session_all_own" on public.session
 create or replace function public.owns_session(session_id uuid)
 returns boolean
 language sql
-security definer
+security invoker
 stable
 set search_path = ''
 as $$
