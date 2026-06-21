@@ -1,8 +1,11 @@
 // src/features/sessions/SessionsListScreen.tsx
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Linking, Pressable, ScrollView, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { appEnv } from "@/src/lib/env";
 
 import { ConfirmDialog } from "@/src/components/app/confirm-dialog";
 import { EmptyState, LoadingState } from "@/src/components/app/screen-state";
@@ -22,6 +25,7 @@ import { SessionCard } from "@/src/features/sessions/SessionCard";
 import { useSession } from "@/src/providers/session-provider";
 
 export default function SessionsListScreen() {
+  const { t } = useTranslation("common");
   const { user } = useSession();
   const { data: summaries, isLoading } = useSessionsList();
   const createSession = useCreateSession();
@@ -117,6 +121,15 @@ export default function SessionsListScreen() {
             )}
           </View>
         )}
+
+        {/* AGPL-3.0: an always-reachable in-app link to the source. */}
+        <Button
+          onPress={() => void Linking.openURL(appEnv.githubRepoUrl)}
+          testID="source-code-link"
+          variant="link"
+        >
+          <Text variant="muted">{t("sourceCode")}</Text>
+        </Button>
       </ScrollView>
 
       <NewSessionSearch
