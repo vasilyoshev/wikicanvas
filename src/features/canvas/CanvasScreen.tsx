@@ -171,9 +171,14 @@ export function CanvasScreen({ sessionId }: CanvasScreenProps) {
 
   return (
     <View testID="canvas-screen" className="flex-1 bg-background">
-      {/* Top bar: add-article search (Phase 5) */}
-      <View className="absolute left-0 right-0 top-0 z-10 flex-row items-start gap-2 p-2">
-        <View className="flex-1" testID="add-article">
+      {/* Top bar: add-article search (Phase 5). box-none lets clicks in the empty
+          area (and the top-right ZoomControls) pass through; the search box is
+          bounded to the left so it never covers the zoom controls. */}
+      <View
+        pointerEvents="box-none"
+        className="absolute left-0 right-0 top-0 z-10 flex-row items-start gap-2 p-2"
+      >
+        <View testID="add-article" style={{ width: "100%", maxWidth: 380 }}>
           <AddArticleSearch lang={sessionLang} onPick={handleAddArticle} />
         </View>
       </View>
