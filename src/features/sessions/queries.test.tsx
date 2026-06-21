@@ -62,6 +62,7 @@ describe("session mutations notify the sync-bus and invalidate", () => {
       title: "Octopus",
       root: { lang: "en", articleTitle: "Octopus" },
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(session).toMatchObject({ id: "s-1" });
     expect(localRepo.createSession).toHaveBeenCalledWith(null, "Octopus", {
       lang: "en",
@@ -75,6 +76,7 @@ describe("session mutations notify the sync-bus and invalidate", () => {
     const client = newClient();
     const { result } = renderHook(() => useRenameSession(), { wrapper: makeWrapper(client) });
     await result.current.mutateAsync({ sessionId: "s-1", title: "New" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(localRepo.renameSession).toHaveBeenCalledWith("s-1", "New");
     expect(notify).toHaveBeenCalledWith("s-1");
     notify.mockRestore();
@@ -87,6 +89,7 @@ describe("session mutations notify the sync-bus and invalidate", () => {
     const spy = jest.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useDeleteSession(), { wrapper: makeWrapper(client) });
     await result.current.mutateAsync({ sessionId: "s-1" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(localRepo.deleteSession).toHaveBeenCalledWith("s-1");
     expect(notify).toHaveBeenCalledWith("s-1");
     expect(spy).toHaveBeenCalledWith({ queryKey: sessionKeys.all });
@@ -99,6 +102,7 @@ describe("session mutations notify the sync-bus and invalidate", () => {
     const client = newClient();
     const { result } = renderHook(() => useUpdateViewport(), { wrapper: makeWrapper(client) });
     await result.current.mutateAsync({ sessionId: "s-1", viewport: { x: 1, y: 2, zoom: 3 } });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(localRepo.updateViewport).toHaveBeenCalledWith("s-1", { x: 1, y: 2, zoom: 3 });
     expect(notify).toHaveBeenCalledWith("s-1");
     notify.mockRestore();
@@ -113,6 +117,7 @@ describe("session mutations notify the sync-bus and invalidate", () => {
       nodeId: "n-1",
       geom: { x: 1, y: 2, width: 3, height: 4 },
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(localRepo.updateNodeGeometry).toHaveBeenCalledWith("s-1", "n-1", {
       x: 1,
       y: 2,
@@ -138,6 +143,7 @@ describe("session mutations notify the sync-bus and invalidate", () => {
         parentNodeId: "n-1",
       },
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(node).toMatchObject({ id: "n-2" });
     expect(spy).toHaveBeenCalledWith({ queryKey: sessionKeys.bundle("s-1") });
   });
