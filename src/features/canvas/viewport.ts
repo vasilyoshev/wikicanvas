@@ -106,3 +106,39 @@ export function zoomAt(
     y: worldFocus.y - focusScreen.y / zoom,
   };
 }
+
+/**
+ * Pan (never zoom) the viewport by the minimum amount so `rect` (world space)
+ * sits fully inside the padded screen. Returns the same viewport if already in.
+ */
+export function panToContain(
+  viewport: Viewport,
+  rect: NodeBounds,
+  screen: { width: number; height: number },
+  padding = 48,
+): Viewport {
+  const tl = worldToScreen({ x: rect.x, y: rect.y }, viewport);
+  const br = worldToScreen({ x: rect.x + rect.width, y: rect.y + rect.height }, viewport);
+  const minX = padding;
+  const minY = padding;
+  const maxX = screen.width - padding;
+  const maxY = screen.height - padding;
+
+  // Screen-space delta needed to bring the rect inside [min,max].
+  let dxScreen = 0;
+  if (tl.x < minX) dxScreen = minX - tl.x;
+  else if (br.x > maxX) dxScreen = maxX - br.x;
+
+  let dyScreen = 0;
+  if (tl.y < minY) dyScreen = minY - tl.y;
+  else if (br.y > maxY) dyScreen = maxY - br.y;
+
+  if (dxScreen === 0 && dyScreen === 0) return viewport;
+
+  // Moving content +dxScreen on screen means decreasing viewport.x by dx/zoom.
+  return {
+    zoom: viewport.zoom,
+    x: viewport.x - dxScreen / viewport.zoom,
+    y: viewport.y - dyScreen / viewport.zoom,
+  };
+}

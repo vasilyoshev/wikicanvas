@@ -7,6 +7,7 @@ import {
   worldToScreen,
   zoomAt,
   fitToContent,
+  panToContain,
 } from "@/src/features/canvas/viewport";
 
 describe("clampZoom", () => {
@@ -126,5 +127,39 @@ describe("fitToContent", () => {
       expect(br.x).toBeLessThanOrEqual(screen.width + 0.001);
       expect(br.y).toBeLessThanOrEqual(screen.height + 0.001);
     }
+  });
+});
+
+describe("panToContain", () => {
+  const screen = { width: 800, height: 600 };
+
+  it("never changes zoom", () => {
+    const vp = { x: 0, y: 0, zoom: 1.5 };
+    const next = panToContain(vp, { x: 5000, y: 5000, width: 100, height: 100 }, screen);
+    expect(next.zoom).toBe(1.5);
+  });
+
+  it("leaves the viewport unchanged when the rect is already visible", () => {
+    const vp = { x: 0, y: 0, zoom: 1 };
+    const rect = { x: 100, y: 100, width: 100, height: 100 };
+    expect(panToContain(vp, rect, screen, 0)).toEqual(vp);
+  });
+
+  it("pans so an off-screen-right rect becomes fully visible", () => {
+    const vp = { x: 0, y: 0, zoom: 1 };
+    const rect = { x: 900, y: 50, width: 100, height: 100 };
+    const next = panToContain(vp, rect, screen, 10);
+    const tl = worldToScreen({ x: rect.x, y: rect.y }, next);
+    const br = worldToScreen({ x: rect.x + rect.width, y: rect.y + rect.height }, next);
+    expect(tl.x).toBeGreaterThanOrEqual(10 - 0.001);
+    expect(br.x).toBeLessThanOrEqual(screen.width - 10 + 0.001);
+  });
+
+  it("pans so an off-screen-top rect becomes fully visible", () => {
+    const vp = { x: 0, y: 500, zoom: 1 };
+    const rect = { x: 100, y: 100, width: 100, height: 100 };
+    const next = panToContain(vp, rect, screen, 10);
+    const tl = worldToScreen({ x: rect.x, y: rect.y }, next);
+    expect(tl.y).toBeGreaterThanOrEqual(10 - 0.001);
   });
 });
