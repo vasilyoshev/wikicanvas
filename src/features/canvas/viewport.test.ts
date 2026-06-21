@@ -1,5 +1,11 @@
 // src/features/canvas/viewport.test.ts
-import { MIN_ZOOM, MAX_ZOOM, clampZoom } from "@/src/features/canvas/viewport";
+import {
+  MIN_ZOOM,
+  MAX_ZOOM,
+  clampZoom,
+  screenToWorld,
+  worldToScreen,
+} from "@/src/features/canvas/viewport";
 
 describe("clampZoom", () => {
   it("returns the zoom unchanged when in bounds", () => {
@@ -26,5 +32,32 @@ describe("clampZoom", () => {
   it("exposes sane bounds", () => {
     expect(MIN_ZOOM).toBeGreaterThan(0);
     expect(MAX_ZOOM).toBeGreaterThan(MIN_ZOOM);
+  });
+});
+
+describe("screenToWorld / worldToScreen", () => {
+  it("maps screen origin to viewport world origin at zoom 1", () => {
+    const vp = { x: 100, y: 50, zoom: 1 };
+    expect(screenToWorld({ x: 0, y: 0 }, vp)).toEqual({ x: 100, y: 50 });
+  });
+
+  it("accounts for zoom when converting screen->world", () => {
+    const vp = { x: 0, y: 0, zoom: 2 };
+    // 200 screen px at 2x = 100 world units.
+    expect(screenToWorld({ x: 200, y: 100 }, vp)).toEqual({ x: 100, y: 50 });
+  });
+
+  it("worldToScreen is the inverse of screenToWorld", () => {
+    const vp = { x: -30, y: 75, zoom: 1.5 };
+    const screen = { x: 320, y: 240 };
+    const world = screenToWorld(screen, vp);
+    const back = worldToScreen(world, vp);
+    expect(back.x).toBeCloseTo(screen.x, 6);
+    expect(back.y).toBeCloseTo(screen.y, 6);
+  });
+
+  it("worldToScreen maps the viewport world origin to screen origin", () => {
+    const vp = { x: 100, y: 50, zoom: 2 };
+    expect(worldToScreen({ x: 100, y: 50 }, vp)).toEqual({ x: 0, y: 0 });
   });
 });

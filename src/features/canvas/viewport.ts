@@ -27,3 +27,25 @@ export function isViewport(value: Viewport): value is Viewport {
     typeof value.x === "number" && typeof value.y === "number" && typeof value.zoom === "number"
   );
 }
+
+/** Convert a screen-space point to world space given the viewport. */
+export function screenToWorld(
+  screen: { x: number; y: number },
+  viewport: Viewport,
+): { x: number; y: number } {
+  return {
+    x: viewport.x + screen.x / viewport.zoom,
+    y: viewport.y + screen.y / viewport.zoom,
+  };
+}
+
+/** Convert a world-space point to screen space given the viewport. */
+export function worldToScreen(
+  world: { x: number; y: number },
+  viewport: Viewport,
+): { x: number; y: number } {
+  return {
+    x: (world.x - viewport.x) * viewport.zoom,
+    y: (world.y - viewport.y) * viewport.zoom,
+  };
+}
