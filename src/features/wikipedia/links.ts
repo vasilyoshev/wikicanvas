@@ -136,3 +136,47 @@ function articleOrIgnore(lang: string, rawTitle: string): LinkClassification {
   }
   return { kind: "article", lang, title };
 }
+
+/**
+ * Accept a pasted Wikipedia article URL OR a plain title and resolve it to
+ * { lang, title }. Returns null for namespaced/non-article URLs or empty input.
+ */
+export function parseArticleInput(
+  input: string,
+  defaultLang: string,
+): { lang: string; title: string } | null {
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return null;
+  }
+
+  // Looks like a URL -> reuse classifyLink to enforce article-only, same rules.
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("//")) {
+    const classified = classifyLink(trimmed, defaultLang);
+    if (classified.kind === "article") {
+      return { lang: classified.lang, title: classified.title };
+    }
+    // For a paste of an OTHER-language article URL, classifyLink ignores it
+    // (v1 same-language rule), but a deliberate paste should still resolve.
+    try {
+      const url = new URL(trimmed, `https://${defaultLang}.wikipedia.org/`);
+      const match = /^([a-z-]{2,12})\.wikipedia\.org$/.exec(url.host);
+      if (match && url.pathname.startsWith("/wiki/")) {
+        const title = normalizeTitle(url.pathname.slice("/wiki/".length));
+        if (title !== "" && !isNonMainNamespace(title)) {
+          return { lang: match[1], title };
+        }
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  // Plain title.
+  const title = normalizeTitle(trimmed);
+  if (title === "" || isNonMainNamespace(title)) {
+    return null;
+  }
+  return { lang: defaultLang, title };
+}

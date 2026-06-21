@@ -1,4 +1,4 @@
-import { normalizeTitle, isNonMainNamespace, classifyLink } from "./links";
+import { normalizeTitle, isNonMainNamespace, classifyLink, parseArticleInput } from "./links";
 
 describe("normalizeTitle", () => {
   it("replaces underscores with spaces", () => {
@@ -149,5 +149,46 @@ describe("classifyLink", () => {
       kind: "external",
       href: "mailto:x@example.com",
     });
+  });
+});
+
+describe("parseArticleInput", () => {
+  it("accepts a plain title with the default lang", () => {
+    expect(parseArticleInput("Albert Einstein", "en")).toEqual({
+      lang: "en",
+      title: "Albert Einstein",
+    });
+  });
+  it("normalizes an underscored plain title", () => {
+    expect(parseArticleInput("Quantum_mechanics", "en")).toEqual({
+      lang: "en",
+      title: "Quantum mechanics",
+    });
+  });
+  it("extracts lang + title from a pasted same-or-other-lang article URL", () => {
+    expect(parseArticleInput("https://de.wikipedia.org/wiki/Physik", "en")).toEqual({
+      lang: "de",
+      title: "Physik",
+    });
+  });
+  it("percent-decodes a pasted URL title", () => {
+    expect(parseArticleInput("https://en.wikipedia.org/wiki/Caf%C3%A9", "en")).toEqual({
+      lang: "en",
+      title: "Café",
+    });
+  });
+  it("returns null for a namespaced URL", () => {
+    expect(parseArticleInput("https://en.wikipedia.org/wiki/File:X.jpg", "en")).toBeNull();
+    expect(parseArticleInput("https://en.wikipedia.org/wiki/Special:Random", "en")).toBeNull();
+  });
+  it("returns null for a non-wikipedia URL", () => {
+    expect(parseArticleInput("https://example.com/page", "en")).toBeNull();
+  });
+  it("returns null for empty/whitespace input", () => {
+    expect(parseArticleInput("", "en")).toBeNull();
+    expect(parseArticleInput("   ", "en")).toBeNull();
+  });
+  it("returns null for a plain namespaced title", () => {
+    expect(parseArticleInput("Category:Science", "en")).toBeNull();
   });
 });
