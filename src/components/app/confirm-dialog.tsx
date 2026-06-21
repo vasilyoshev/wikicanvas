@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ActivityIndicator, Modal, View } from "react-native";
 
 import { Button } from "@/src/components/react-native-reusables/button";
@@ -21,6 +22,7 @@ interface ConfirmDialogProps {
   error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
+  children?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -33,6 +35,7 @@ export function ConfirmDialog({
   error,
   onConfirm,
   onCancel,
+  children,
 }: ConfirmDialogProps) {
   const reduceMotionEnabled = useReduceMotionEnabled();
 
@@ -51,6 +54,7 @@ export function ConfirmDialog({
           </CardHeader>
           <CardContent>
             <View className="gap-3">
+              {children ?? null}
               {error ? <Text className="text-sm text-destructive">{error}</Text> : null}
               <Button
                 disabled={isPending}
