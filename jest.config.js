@@ -8,6 +8,11 @@ module.exports = {
     // resolves index.ts rather than index.native.ts (RN haste resolver would
     // otherwise prefer the .native extension because defaultPlatform is 'ios').
     "^@/src/lib/local-store/index$": "<rootDir>/src/lib/local-store/index.ts",
+    // Force web implementation so ArticleHtml.test.tsx exercises the iframe +
+    // shouldAcceptMessage guard, not the native WebView (which requires a native
+    // binary and cannot run in Jest).
+    "^(\\./|@/src/features/wikipedia/)ArticleHtml$":
+      "<rootDir>/src/features/wikipedia/ArticleHtml.tsx",
     "^@/(.*)$": "<rootDir>/$1",
     // @expo/vector-icons requires expo-asset + expo-font (not available in Jest).
     // The manual mock in __mocks__/@expo/vector-icons/ renders a plain RN Text
