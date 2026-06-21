@@ -28,11 +28,23 @@ describe("ARTICLE_CACHE_TTL_MS", () => {
 });
 
 describe("cacheKey", () => {
-  it("lower-cases lang + normalized title", () => {
-    expect(cacheKey("EN", "Albert_Einstein")).toBe("en:albert einstein");
+  it("lower-cases lang but preserves title case", () => {
+    expect(cacheKey("EN", "Albert_Einstein")).toBe("en:Albert Einstein");
   });
-  it("normalizes percent-encoding and fragments before lower-casing", () => {
-    expect(cacheKey("en", "Caf%C3%A9#x")).toBe("en:café");
+  it("normalizes underscores and percent-encoding but keeps case", () => {
+    expect(cacheKey("en", "Albert_Einstein")).toBe("en:Albert Einstein");
+  });
+  it("strips fragments in the normalized title", () => {
+    expect(cacheKey("en", "Caf%C3%A9#x")).toBe("en:Café");
+  });
+  // Fix 2: case-distinct Wikipedia articles must not collide
+  it("distinguishes case-distinct titles (PH vs Ph vs pH)", () => {
+    expect(cacheKey("en", "PH")).not.toBe(cacheKey("en", "Ph"));
+    expect(cacheKey("en", "Ph")).not.toBe(cacheKey("en", "pH"));
+    expect(cacheKey("en", "PH")).not.toBe(cacheKey("en", "pH"));
+  });
+  it("treats lang case-insensitively (EN === en)", () => {
+    expect(cacheKey("EN", "Foo")).toBe(cacheKey("en", "Foo"));
   });
 });
 

@@ -19,18 +19,26 @@ describe("USER_AGENT", () => {
 });
 
 describe("LANG_PATTERN / validateLang", () => {
-  it("matches 2-12 lowercase letters and hyphens", () => {
-    expect(LANG_PATTERN.source).toBe("^[a-z-]{2,12}$");
+  it("has the tightened primary-subtag pattern (2-8 letters + optional hyphen subtags)", () => {
+    // Fix 7: pattern requires a real primary subtag shape, not just any hyphens/letters.
+    expect(LANG_PATTERN.source).toBe("^[a-z]{2,8}(-[a-z]+)*$");
   });
-  it.each(["en", "de", "simple", "zh-yue", "be-tarask"])("accepts %s", (lang) => {
+  it.each(["en", "de", "fr", "simple", "zh-yue", "be-tarask"])("accepts valid code %s", (lang) => {
     expect(validateLang(lang)).toBe(true);
   });
   it.each(["", "e", "EN", "en1", "en_US", "a".repeat(13), "en ", null, undefined, 42, {}])(
-    "rejects %s",
+    "rejects pre-existing invalid %s",
     (lang) => {
       expect(validateLang(lang)).toBe(false);
     },
   );
+  // Fix 7: edge-junk that the old ^[a-z-]{2,12}$ pattern accepted but the new pattern rejects
+  it.each(["--", "-en", "en-", "en--us"])("rejects junk code %s", (lang) => {
+    expect(validateLang(lang)).toBe(false);
+  });
+  it("rejects a primary-only code that is too long (toolongprimary = 13 chars)", () => {
+    expect(validateLang("toolongprimary")).toBe(false);
+  });
 });
 
 describe("validateTitle", () => {

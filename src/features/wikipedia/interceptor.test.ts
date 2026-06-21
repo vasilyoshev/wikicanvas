@@ -59,4 +59,36 @@ describe("buildInterceptorScript", () => {
       href: "https://de.wikipedia.org/wiki/Physik",
     });
   });
+
+  // Fix 1: query string must be stripped in the injected normalizeTitle copy
+  it("strips ?action=edit from a /wiki/ link and classifies as wikilink", () => {
+    // ?action=edit on a /wiki/ path — interceptor sees the raw href attribute
+    // which may include the query. After normalizeTitle strips it, we get the clean title.
+    expect(runClassify("/wiki/Physics?section=0")).toEqual({
+      type: "wikilink",
+      lang: "en",
+      title: "Physics",
+    });
+  });
+  it("strips ?oldid= from a Parsoid ./ link", () => {
+    expect(runClassify("./Foo?oldid=123")).toEqual({
+      type: "wikilink",
+      lang: "en",
+      title: "Foo",
+    });
+  });
+
+  // Fix 5: leading-colon namespace bypass in the injected isNonMain copy
+  it("classifies :File:Example.jpg (leading-colon form) as external (non-main, not wikilink)", () => {
+    expect(runClassify("/wiki/:File:Example.jpg")).toEqual({
+      type: "external",
+      href: "/wiki/:File:Example.jpg",
+    });
+  });
+  it("classifies :Special:Random (leading-colon form) as external", () => {
+    expect(runClassify("/wiki/:Special:Random")).toEqual({
+      type: "external",
+      href: "/wiki/:Special:Random",
+    });
+  });
 });

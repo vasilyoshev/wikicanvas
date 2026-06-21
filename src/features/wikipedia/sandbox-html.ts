@@ -50,16 +50,25 @@ export function buildSrcDoc(html: string, lang: string): string {
   if (isFullDocument) {
     // Inject base + viewport + style at the start of <head>.
     // Inject interceptor script before </body>.
-    let result = html;
+    // If either anchor is missing, fall through to the fragment-wrapping path so
+    // injection is guaranteed (silently dropping injects would break link interception).
+    const headRe = /(<head[^>]*>)/i;
+    const bodyCloseRe = /<\/body>/i;
 
-    result = result.replace(
-      /(<head[^>]*>)/i,
-      `$1\n<meta charset="utf-8" />\n${viewportMeta}\n${baseTag}\n${styleTag}`,
-    );
+    if (!headRe.test(html) || !bodyCloseRe.test(html)) {
+      // Fall through to fragment path below.
+    } else {
+      let result = html;
 
-    result = result.replace(/<\/body>/i, `${scriptTag}\n</body>`);
+      result = result.replace(
+        headRe,
+        `$1\n<meta charset="utf-8" />\n${viewportMeta}\n${baseTag}\n${styleTag}`,
+      );
 
-    return result;
+      result = result.replace(bodyCloseRe, `${scriptTag}\n</body>`);
+
+      return result;
+    }
   }
 
   // Fragment path: build a clean document around the content.

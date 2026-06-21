@@ -19,6 +19,11 @@ export function buildInterceptorScript(lang: string): string {
   function normalizeTitle(raw) {
     var v = ("" + raw).trim();
     if (v.indexOf("./") === 0) v = v.slice(2);
+    // Strip a single leading ":" (the [[:NS:X]] wikitext form).
+    if (v.charAt(0) === ":") v = v.slice(1);
+    // Strip query string before percent-decoding (must come before #fragment strip).
+    var q = v.indexOf("?");
+    if (q !== -1) v = v.slice(0, q);
     var h = v.indexOf("#");
     if (h !== -1) v = v.slice(0, h);
     v = v.replace(/_/g, " ");

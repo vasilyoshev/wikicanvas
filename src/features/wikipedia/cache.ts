@@ -4,9 +4,11 @@ import type { ArticleResult } from "@/src/features/wikipedia/types";
 
 export const ARTICLE_CACHE_TTL_MS = 86_400_000; // 24h
 
-/** `${lang}:${normalized-lowercased title}` — stable de-dupe/cache key. */
+/** `${lang}:${normalized title}` — stable de-dupe/cache key. Lang is lower-cased
+ * (language codes are case-insensitive); title case is preserved exactly because
+ * Wikipedia treats "PH", "Ph", and "pH" as distinct articles. */
 export function cacheKey(lang: string, title: string): string {
-  return `${lang.toLowerCase()}:${normalizeTitle(title).toLowerCase()}`;
+  return `${lang.toLowerCase()}:${normalizeTitle(title)}`;
 }
 
 export function isFresh(

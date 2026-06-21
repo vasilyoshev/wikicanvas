@@ -23,6 +23,17 @@ describe("normalizeTitle", () => {
   it("returns invalid percent sequences unchanged rather than throwing", () => {
     expect(normalizeTitle("100%_complete")).toBe("100% complete");
   });
+  // Fix 1: query string stripping
+  it("strips a ?query string", () => {
+    expect(normalizeTitle("Physics?action=edit")).toBe("Physics");
+  });
+  it("strips ?query before #fragment when both present", () => {
+    expect(normalizeTitle("Foo?oldid=123#Section")).toBe("Foo");
+  });
+  // Fix 5: leading-colon (:[[:NS:X]] form) stripping
+  it("strips a single leading colon before namespace check", () => {
+    expect(normalizeTitle(":File:Example.jpg")).toBe("File:Example.jpg");
+  });
 });
 
 describe("isNonMainNamespace", () => {
@@ -149,6 +160,55 @@ describe("classifyLink", () => {
       kind: "external",
       href: "mailto:x@example.com",
     });
+  });
+
+  // Fix 1: query string must be stripped — /wiki/ and ./ relative forms with ?query
+  // The key invariant is that relative and absolute forms produce the SAME result.
+  // Before the fix, "/wiki/Foo?action=edit" gave title "Foo?action=edit" (broken).
+  // After the fix, the query is stripped and the title is "Foo" (same as absolute URL).
+  it("strips ?action=edit from a /wiki/ link and classifies as article (consistent with absolute)", () => {
+    expect(classifyLink("/wiki/Foo?action=edit", "en")).toEqual({
+      kind: "article",
+      lang: "en",
+      title: "Foo",
+    });
+  });
+  it("strips ?oldid= from a ./ link and classifies as article (consistent with absolute)", () => {
+    expect(classifyLink("./Foo?oldid=1", "en")).toEqual({
+      kind: "article",
+      lang: "en",
+      title: "Foo",
+    });
+  });
+  it("classifies /wiki/Physics?section=0 consistently with the absolute URL form", () => {
+    // Both relative (query-stripped → title "Physics") and absolute give article.
+    const absolute = classifyLink("https://en.wikipedia.org/wiki/Physics", "en");
+    const relative = classifyLink("/wiki/Physics?section=0", "en");
+    expect(relative).toEqual(absolute);
+    expect(relative).toEqual({ kind: "article", lang: "en", title: "Physics" });
+  });
+
+  // Fix 3: protocol-relative URLs
+  it("classifies a same-lang protocol-relative URL as article", () => {
+    expect(classifyLink("//en.wikipedia.org/wiki/Physics", "en")).toEqual({
+      kind: "article",
+      lang: "en",
+      title: "Physics",
+    });
+  });
+  it("ignores other-lang protocol-relative URLs (v1 same-language rule)", () => {
+    expect(classifyLink("//fr.wikipedia.org/wiki/Physique", "en")).toEqual({ kind: "ignore" });
+  });
+  it("ignores a single-slash non-wiki path (not protocol-relative)", () => {
+    expect(classifyLink("/w/index.php?title=Foo&action=edit", "en")).toEqual({ kind: "ignore" });
+  });
+
+  // Fix 5: leading-colon namespace bypass
+  it("ignores /wiki/:File:Example.jpg (leading-colon namespace)", () => {
+    expect(classifyLink("/wiki/:File:Example.jpg", "en")).toEqual({ kind: "ignore" });
+  });
+  it("ignores /wiki/:Special:Random (leading-colon special)", () => {
+    expect(classifyLink("/wiki/:Special:Random", "en")).toEqual({ kind: "ignore" });
   });
 });
 

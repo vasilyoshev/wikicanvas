@@ -4,7 +4,10 @@
 export const USER_AGENT =
   "WikiCanvas/1.0 (https://github.com/vasilyoshev/wikicanvas; vasil.yoshev@gmail.com)";
 
-export const LANG_PATTERN = /^[a-z-]{2,12}$/;
+// Primary subtag (2-8 lowercase letters) + optional hyphen-joined lowercase subtag(s).
+// Accepts: "en", "de", "simple" (6), "zh-yue", "be-tarask".
+// Rejects: "--", "-en", "en-", "toolongprimary" (13 chars), "en--us", mixed case.
+export const LANG_PATTERN = /^[a-z]{2,8}(-[a-z]+)*$/;
 export const MAX_TITLE_LENGTH = 512;
 
 export function validateLang(lang: unknown): lang is string {

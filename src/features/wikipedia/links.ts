@@ -23,11 +23,20 @@ const NON_MAIN_NAMESPACES = new Set<string>([
   "image talk",
 ]);
 
-/** Percent-decode, drop Parsoid './' prefix, '_'->space, strip #fragment, trim. */
+/** Percent-decode, drop Parsoid './' prefix, '_'->space, strip ?query and #fragment, trim. */
 export function normalizeTitle(raw: string): string {
   let value = raw.trim();
   if (value.startsWith("./")) {
     value = value.slice(2);
+  }
+  // Strip a single leading ":" (the [[:NS:X]] wikitext form) before any other processing.
+  if (value.startsWith(":")) {
+    value = value.slice(1);
+  }
+  // Strip query string before percent-decoding (must come before #fragment strip).
+  const queryIndex = value.indexOf("?");
+  if (queryIndex !== -1) {
+    value = value.slice(0, queryIndex);
   }
   const hashIndex = value.indexOf("#");
   if (hashIndex !== -1) {
@@ -92,8 +101,11 @@ export function classifyLink(href: string, pageLang: string): LinkClassification
     const titlePart = raw.startsWith(WIKI_PATH) ? raw.slice(WIKI_PATH.length) : raw;
     return articleOrIgnore(pageLang, titlePart);
   }
-  // Relative non-article paths (edit endpoints etc.) never spawn.
-  if (raw.startsWith("/")) {
+  // Protocol-relative URLs "//host/..." must fall through to URL parsing, NOT be
+  // treated as single-slash relative paths. Handle them before the blanket "/" guard.
+  // (new URL("//en.wikipedia.org/...", base) correctly resolves with https: protocol.)
+  if (!raw.startsWith("//") && raw.startsWith("/")) {
+    // Relative non-article paths (edit endpoints etc.) never spawn.
     return { kind: "ignore" };
   }
 
