@@ -4,6 +4,10 @@ module.exports = {
   preset: "jest-expo",
   setupFilesAfterEnv: ["<rootDir>/test/setup.js"],
   moduleNameMapper: {
+    // Force the web (IndexedDB) local-store entry in Jest so index.test.ts
+    // resolves index.ts rather than index.native.ts (RN haste resolver would
+    // otherwise prefer the .native extension because defaultPlatform is 'ios').
+    "^@/src/lib/local-store/index$": "<rootDir>/src/lib/local-store/index.ts",
     "^@/(.*)$": "<rootDir>/$1",
     // @expo/vector-icons requires expo-asset + expo-font (not available in Jest).
     // The manual mock in __mocks__/@expo/vector-icons/ renders a plain RN Text
