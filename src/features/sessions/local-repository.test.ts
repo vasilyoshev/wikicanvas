@@ -3,10 +3,23 @@ import {
   listSessions,
   getSessionBundle,
   createSession,
+  renameSession,
+  deleteSession,
+  updateViewport,
+  addNode,
+  addEdge,
+  updateNodeGeometry,
 } from "@/src/features/sessions/local-repository";
 import { getLocalStore } from "@/src/lib/local-store/index";
 import type { LocalStore } from "@/src/lib/local-store/types";
-import type { Session, Node, Edge, SessionBundle } from "@/src/features/sessions/types";
+import type {
+  Session,
+  Node,
+  Edge,
+  SessionBundle,
+  Viewport,
+  NodeGeometry,
+} from "@/src/features/sessions/types";
 
 jest.mock("@/src/lib/local-store/index", () => ({
   getLocalStore: jest.fn(),
@@ -144,5 +157,145 @@ describe("local-repository: read + create", () => {
         previewNodes: [{ x: 10, y: 20, width: 380, height: 520 }],
       },
     ]);
+  });
+});
+
+function baseSession(over: Partial<Session> = {}): Session {
+  return {
+    id: "s-1",
+    userId: "u-1",
+    title: "Octopus",
+    viewportX: 0,
+    viewportY: 0,
+    viewportZoom: 1,
+    createdAt: "2026-06-20T08:00:00.000Z",
+    updatedAt: "2026-06-20T08:00:00.000Z", // stale clock
+    deletedAt: null,
+    ...over,
+  };
+}
+
+function baseNode(over: Partial<Node> = {}): Node {
+  return {
+    id: "n-1",
+    sessionId: "s-1",
+    articleTitle: "Octopus",
+    lang: "en",
+    x: 0,
+    y: 0,
+    width: 380,
+    height: 520,
+    parentNodeId: null,
+    createdAt: "2026-06-20T08:00:00.000Z",
+    ...over,
+  };
+}
+
+describe("local-repository: mutations bump session.updatedAt (LWW clock)", () => {
+  const FIXED = "2026-06-20T15:30:00.000Z";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers().setSystemTime(new Date(FIXED));
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it("renameSession sets the title and bumps updatedAt", async () => {
+    const { store } = makeFakeStore({ sessions: [baseSession()] });
+    mockGetLocalStore.mockReturnValue(store);
+
+    const updated = await renameSession("s-1", "Cephalopod");
+    expect(updated.title).toBe("Cephalopod");
+    expect(updated.updatedAt).toBe(FIXED);
+    expect(store.upsertSession).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Cephalopod", updatedAt: FIXED }),
+    );
+  });
+
+  it("deleteSession soft-deletes with deleted_at = now (bumps updatedAt too)", async () => {
+    const { store } = makeFakeStore({ sessions: [baseSession()] });
+    mockGetLocalStore.mockReturnValue(store);
+
+    await deleteSession("s-1");
+    expect(store.softDeleteSession).toHaveBeenCalledWith("s-1", FIXED);
+  });
+
+  it("updateViewport persists viewport and bumps updatedAt", async () => {
+    const { store } = makeFakeStore({ sessions: [baseSession()] });
+    mockGetLocalStore.mockReturnValue(store);
+
+    const vp: Viewport = { x: 100, y: -50, zoom: 2 };
+    await updateViewport("s-1", vp);
+    expect(store.upsertSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        viewportX: 100,
+        viewportY: -50,
+        viewportZoom: 2,
+        updatedAt: FIXED,
+      }),
+    );
+  });
+
+  it("addNode creates a node (id/sessionId/createdAt assigned) and bumps the session", async () => {
+    const { store } = makeFakeStore({ sessions: [baseSession()] });
+    mockGetLocalStore.mockReturnValue(store);
+
+    const node = await addNode("s-1", {
+      articleTitle: "Cephalopod",
+      lang: "en",
+      x: 420,
+      y: 0,
+      width: 380,
+      height: 520,
+      parentNodeId: "n-1",
+    });
+    expect(node.id).toBeTruthy();
+    expect(node.sessionId).toBe("s-1");
+    expect(node.createdAt).toBe(FIXED);
+    expect(node.articleTitle).toBe("Cephalopod");
+    expect(store.upsertNode).toHaveBeenCalledWith(expect.objectContaining({ id: node.id }));
+    expect(store.upsertSession).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: FIXED }));
+  });
+
+  it("addEdge creates an edge (id/sessionId/createdAt assigned) and bumps the session", async () => {
+    const { store } = makeFakeStore({ sessions: [baseSession()] });
+    mockGetLocalStore.mockReturnValue(store);
+
+    const edge = await addEdge("s-1", {
+      sourceNodeId: "n-1",
+      targetNodeId: "n-2",
+      clickedLinkText: "Cephalopod",
+    });
+    expect(edge.id).toBeTruthy();
+    expect(edge.sessionId).toBe("s-1");
+    expect(edge.createdAt).toBe(FIXED);
+    expect(store.upsertEdge).toHaveBeenCalledWith(expect.objectContaining({ id: edge.id }));
+    expect(store.upsertSession).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: FIXED }));
+  });
+
+  it("updateNodeGeometry writes geometry and bumps the session", async () => {
+    const { store } = makeFakeStore({ sessions: [baseSession()], nodes: [baseNode()] });
+    mockGetLocalStore.mockReturnValue(store);
+
+    const geom: NodeGeometry = { x: 12, y: 34, width: 400, height: 600 };
+    await updateNodeGeometry("s-1", "n-1", geom);
+    expect(store.upsertNode).toHaveBeenCalledWith(expect.objectContaining({ ...geom, id: "n-1" }));
+    expect(store.upsertSession).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: FIXED }));
+  });
+
+  it("addNode throws on a missing session (no clock to bump)", async () => {
+    const { store } = makeFakeStore();
+    mockGetLocalStore.mockReturnValue(store);
+    await expect(
+      addNode("missing", {
+        articleTitle: "X",
+        lang: "en",
+        x: 0,
+        y: 0,
+        width: 380,
+        height: 520,
+        parentNodeId: null,
+      }),
+    ).rejects.toThrow("Session not found");
   });
 });
