@@ -56,6 +56,8 @@ export function CanvasBoard({
   const setViewport = useCanvasStore((s) => s.setViewport);
   const selectNode = useCanvasStore((s) => s.selectNode);
   const setHovered = useCanvasStore((s) => s.setHovered);
+  const setDragging = useCanvasStore((s) => s.setDragging);
+  const setResizing = useCanvasStore((s) => s.setResizing);
 
   const commitViewport = useCallback(
     (next: Viewport) => {
@@ -192,34 +194,32 @@ export function CanvasBoard({
   // onNodeGeometryChange so the session layer can persist updated positions.
   const handleDragMove = useCallback(
     (nodeId: string, dxWorld: number, dyWorld: number) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      if (!node) return;
+      setDragging(nodeId);
+      const n = nodeById.get(nodeId);
+      if (!n) return;
       onNodeGeometryChange(nodeId, {
-        x: node.x + dxWorld,
-        y: node.y + dyWorld,
-        width: node.width,
-        height: node.height,
+        x: n.x + dxWorld,
+        y: n.y + dyWorld,
+        width: n.width,
+        height: n.height,
       });
     },
-    [nodes, onNodeGeometryChange],
+    [nodeById, onNodeGeometryChange, setDragging],
   );
 
-  const handleDragEnd = useCallback(() => {
-    // no-op at this layer; persistence happened via handleDragMove
-  }, []);
+  const handleDragEnd = useCallback(() => setDragging(null), [setDragging]);
 
   const handleResize = useCallback(
     (nodeId: string, width: number, height: number) => {
-      const node = nodes.find((n) => n.id === nodeId);
-      if (!node) return;
-      onNodeGeometryChange(nodeId, { x: node.x, y: node.y, width, height });
+      setResizing(nodeId);
+      const n = nodeById.get(nodeId);
+      if (!n) return;
+      onNodeGeometryChange(nodeId, { x: n.x, y: n.y, width, height });
     },
-    [nodes, onNodeGeometryChange],
+    [nodeById, onNodeGeometryChange, setResizing],
   );
 
-  const handleResizeEnd = useCallback(() => {
-    // no-op at this layer
-  }, []);
+  const handleResizeEnd = useCallback(() => setResizing(null), [setResizing]);
 
   return (
     <View testID="canvas-board" className="flex-1 overflow-hidden bg-background">
