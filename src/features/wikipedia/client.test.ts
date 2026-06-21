@@ -1,4 +1,4 @@
-import { buildProxyUrl, getArticle, __resetInFlightForTests } from "./client";
+import { buildProxyUrl, getArticle, __resetInFlightForTests, searchTitles } from "./client";
 
 jest.mock("@/src/lib/env", () => ({
   appEnv: { supabaseUrl: "https://proj.supabase.co" },
@@ -127,5 +127,67 @@ describe("getArticle", () => {
     ]);
     expect(a.canonicalTitle).toBe(b.canonicalTitle);
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+const SEARCH_BODY = {
+  pages: [
+    {
+      id: 1,
+      key: "Albert_Einstein",
+      title: "Albert Einstein",
+      description: "German-born physicist",
+      thumbnail: { url: "//upload.wikimedia.org/x.jpg" },
+    },
+    { id: 2, key: "Einsteinium", title: "Einsteinium", description: null, thumbnail: null },
+  ],
+};
+
+describe("searchTitles", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("maps proxy search pages into SearchResult[]", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(SEARCH_BODY),
+    } as unknown as Response) as unknown as typeof fetch;
+
+    const results = await searchTitles("en", "ein");
+    expect(results).toEqual([
+      {
+        lang: "en",
+        title: "Albert Einstein",
+        description: "German-born physicist",
+        thumbnailUrl: "//upload.wikimedia.org/x.jpg",
+      },
+      { lang: "en", title: "Einsteinium", description: null, thumbnailUrl: null },
+    ]);
+  });
+
+  it("defaults limit to 10 and passes lang/q to the proxy", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ pages: [] }) });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    await searchTitles("en", "ein");
+    const calledUrl = fetchMock.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("mode=search");
+    expect(calledUrl).toContain("limit=10");
+    expect(calledUrl).toContain("q=ein");
+  });
+
+  it("returns [] for an empty/whitespace query without fetching", async () => {
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    expect(await searchTitles("en", "   ")).toEqual([]);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("throws on a non-ok proxy response", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+    } as unknown as Response) as unknown as typeof fetch;
+    await expect(searchTitles("en", "ein")).rejects.toThrow();
   });
 });

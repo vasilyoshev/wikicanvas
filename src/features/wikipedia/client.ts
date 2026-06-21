@@ -7,7 +7,12 @@ import {
   isFresh,
 } from "@/src/features/wikipedia/cache";
 import { getLocalStore } from "@/src/lib/local-store";
-import type { ArticleResult, WithHtmlResponse } from "@/src/features/wikipedia/types";
+import type {
+  ArticleResult,
+  WithHtmlResponse,
+  SearchResult,
+  SearchTitleResponse,
+} from "@/src/features/wikipedia/types";
 import type { CacheEntry } from "@/src/lib/local-store/types";
 
 /** Builds the wiki-proxy URL (exported for tests). */
@@ -113,4 +118,28 @@ async function fetchArticle(lang: string, title: string, key: string): Promise<A
     etag,
     fromCache: false,
   };
+}
+
+/** search-as-you-type via wiki-proxy ?mode=search. limit default 10. */
+export async function searchTitles(
+  lang: string,
+  q: string,
+  limit: number = 10,
+): Promise<SearchResult[]> {
+  const trimmed = q.trim();
+  if (trimmed === "") {
+    return [];
+  }
+  const url = buildProxyUrl({ lang, mode: "search", q: trimmed, limit });
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`wiki-proxy search failed: ${response.status}`);
+  }
+  const body = (await response.json()) as SearchTitleResponse;
+  return body.pages.map((page) => ({
+    lang,
+    title: page.title,
+    description: page.description ?? null,
+    thumbnailUrl: page.thumbnail?.url ?? null,
+  }));
 }
