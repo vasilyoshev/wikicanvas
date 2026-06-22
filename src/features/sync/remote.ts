@@ -12,6 +12,8 @@ import {
 import { requireSupabase } from "@/src/lib/supabase";
 import type { SyncBundle } from "@/src/features/sync/types";
 
+import { getLocalStore } from "@/src/lib/local-store";
+
 /** Pull all of a user's session bundles from Supabase (incl. tombstones). */
 export async function fetchRemoteBundles(userId: string): Promise<SyncBundle[]> {
   const client = requireSupabase();
@@ -49,6 +51,19 @@ export async function fetchRemoteBundles(userId: string): Promise<SyncBundle[]> 
     nodes: (nodesBySession.get(row.id) ?? []).map(nodeRowToDomain),
     edges: (edgesBySession.get(row.id) ?? []).map(edgeRowToDomain),
   }));
+}
+
+/** Adopt anon LocalStore sessions: stamp user_id locally; returns adopted bundles ready to push. */
+export async function adoptAnonSessions(userId: string): Promise<SyncBundle[]> {
+  const store = getLocalStore();
+  const adoptedIds = await store.adoptAnonymousSessions(userId);
+
+  const bundles: SyncBundle[] = [];
+  for (const id of adoptedIds) {
+    const bundle = await store.getBundle(id);
+    if (bundle) bundles.push(bundle);
+  }
+  return bundles;
 }
 
 /** Upsert one bundle: session + replace its nodes/edges remotely. */

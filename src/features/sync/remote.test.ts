@@ -5,10 +5,18 @@ import { requireSupabase } from "@/src/lib/supabase";
 // --- append to src/features/sync/remote.test.ts ---
 import { pushBundle } from "@/src/features/sync/remote";
 import type { SyncBundle } from "@/src/features/sync/types";
+import { getLocalStore } from "@/src/lib/local-store";
+import { adoptAnonSessions } from "@/src/features/sync/remote";
 
 jest.mock("@/src/lib/supabase", () => ({
   requireSupabase: jest.fn(),
 }));
+
+jest.mock("@/src/lib/local-store", () => ({
+  getLocalStore: jest.fn(),
+}));
+
+const mockGetLocalStore = jest.mocked(getLocalStore);
 
 const mockRequireSupabase = jest.mocked(requireSupabase);
 
@@ -200,5 +208,61 @@ describe("pushBundle", () => {
     }));
     mockRequireSupabase.mockReturnValue({ from } as unknown as ReturnType<typeof requireSupabase>);
     await expect(pushBundle(makeBundle())).rejects.toEqual({ message: "no" });
+  });
+});
+
+describe("adoptAnonSessions", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns [] when there are no anonymous sessions", async () => {
+    mockGetLocalStore.mockReturnValue({
+      adoptAnonymousSessions: jest.fn().mockResolvedValue([]),
+      getBundle: jest.fn(),
+    } as unknown as ReturnType<typeof getLocalStore>);
+
+    await expect(adoptAnonSessions("u1")).resolves.toEqual([]);
+  });
+
+  it("stamps anon sessions, then loads each adopted bundle", async () => {
+    const adoptedBundle = {
+      session: {
+        id: "s1",
+        userId: "u1",
+        title: "T",
+        viewportX: 0,
+        viewportY: 0,
+        viewportZoom: 1,
+        createdAt: "c",
+        updatedAt: "u",
+        deletedAt: null,
+      },
+      nodes: [],
+      edges: [],
+    };
+    const adoptAnonymousSessions = jest.fn().mockResolvedValue(["s1"]);
+    const getBundle = jest.fn().mockResolvedValue(adoptedBundle);
+    mockGetLocalStore.mockReturnValue({
+      adoptAnonymousSessions,
+      getBundle,
+    } as unknown as ReturnType<typeof getLocalStore>);
+
+    const result = await adoptAnonSessions("u1");
+
+    expect(adoptAnonymousSessions).toHaveBeenCalledWith("u1");
+    expect(getBundle).toHaveBeenCalledWith("s1");
+    expect(result).toEqual([adoptedBundle]);
+  });
+
+  it("skips an adopted id whose bundle is missing", async () => {
+    mockGetLocalStore.mockReturnValue({
+      adoptAnonymousSessions: jest.fn().mockResolvedValue(["s1", "s2"]),
+      getBundle: jest
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ session: { id: "s2" }, nodes: [], edges: [] }),
+    } as unknown as ReturnType<typeof getLocalStore>);
+
+    const result = await adoptAnonSessions("u1");
+    expect(result).toEqual([{ session: { id: "s2" }, nodes: [], edges: [] }]);
   });
 });
