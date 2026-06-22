@@ -22,9 +22,10 @@ import {
 } from "@/src/features/sessions/queries";
 import { NewSessionSearch } from "@/src/features/sessions/NewSessionSearch";
 import { SessionCard } from "@/src/features/sessions/SessionCard";
+import { runSyncSignIn } from "@/src/features/sync/use-sync";
 import { useSession } from "@/src/providers/session-provider";
 
-export default function SessionsListScreen() {
+export function SessionsListScreen() {
   const { t } = useTranslation("common");
   const { user } = useSession();
   const { data: summaries, isLoading } = useSessionsList();
@@ -37,8 +38,11 @@ export default function SessionsListScreen() {
   const [renameValue, setRenameValue] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  // Phase 7 owns sync wiring; this is a placeholder handler the button calls.
-  const handleSignInToSync = () => {};
+  const handleSignInToSync = () => {
+    void runSyncSignIn().catch((error) => {
+      console.warn("[sync] sign-in failed", error);
+    });
+  };
 
   const openSession = (sessionId: string) => router.push(`/canvas/${sessionId}`);
 
@@ -176,3 +180,5 @@ export default function SessionsListScreen() {
     </SafeAreaView>
   );
 }
+
+export default SessionsListScreen;
