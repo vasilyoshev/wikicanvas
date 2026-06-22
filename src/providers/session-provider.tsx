@@ -4,6 +4,7 @@ import type { Session, User } from "@supabase/supabase-js";
 
 import { hasSupabaseConfig } from "@/src/lib/env";
 import { initializeSupabaseAutoRefresh, supabase } from "@/src/lib/supabase";
+import { getActiveUserId, subscribeActiveUserId } from "@/src/lib/active-user";
 
 type SessionStatus = "loading" | "ready";
 
@@ -19,6 +20,8 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<SessionStatus>("loading");
+  // E2E / test seam: tracks fake user id injected by runSyncSignIn when real OAuth isn't used.
+  const [fakeUserId, setFakeUserId] = useState<string | null>(getActiveUserId);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -63,11 +66,18 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, [queryClient]);
 
+  // Subscribe to the active-user signal so the e2e fake-user path updates the context.
+  useEffect(() => subscribeActiveUserId(setFakeUserId), []);
+
+  // Real Supabase user takes precedence; fake user is the fallback for e2e / no-Supabase paths.
+  const resolvedUser: User | null =
+    session?.user ?? (fakeUserId ? ({ id: fakeUserId } as User) : null);
+
   const value: SessionContextValue = {
     hasSupabaseConfig,
     session,
     status,
-    user: session?.user ?? null,
+    user: resolvedUser,
   };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

@@ -61,13 +61,13 @@ describe("IndexedDBLocalStore", () => {
     await expect(store.getSession("s-1")).resolves.toEqual(s);
   });
 
-  it("lists all local sessions when userId=null, or only owned sessions for a given userId", async () => {
+  it("listSessions(null) returns only anonymous sessions; listSessions(userId) returns only that user's", async () => {
     await store.upsertSession(makeSession({ id: "s-anon", userId: null }));
     await store.upsertSession(makeSession({ id: "s-user", userId: "u-1" }));
 
-    // null → all local sessions (local-first display path: show everything in the store)
-    const all = await store.listSessions(null);
-    expect(all.map((s) => s.id).sort()).toEqual(["s-anon", "s-user"]);
+    // null → anonymous-only (user_id === null); never returns owned sessions
+    const anon = await store.listSessions(null);
+    expect(anon.map((s) => s.id)).toEqual(["s-anon"]);
 
     const owned = await store.listSessions("u-1");
     expect(owned.map((s) => s.id)).toEqual(["s-user"]);

@@ -8,6 +8,7 @@ import {
 } from "@/src/features/sync/orchestrator";
 import { sessionKeys } from "@/src/features/sessions/queries";
 import { queryClient } from "@/src/lib/query-client";
+import { setActiveUserId } from "@/src/lib/active-user";
 import { syncBus } from "@/src/lib/sync-bus";
 import { useSession } from "@/src/providers/session-provider";
 
@@ -50,6 +51,9 @@ export async function runSyncSignIn(): Promise<void> {
   const fakeUser = (globalThis as { __WIKICANVAS_FAKE_USER__?: string }).__WIKICANVAS_FAKE_USER__;
   if (fakeUser) {
     // e2e/test seam: skip the real OAuth redirect and start sync directly.
+    // Also update the active-user signal so SessionProvider reflects the signed-in state
+    // without a real Supabase auth event (enables useSessionsList to re-key by userId).
+    setActiveUserId(fakeUser);
     startSyncForUser(fakeUser);
     return;
   }

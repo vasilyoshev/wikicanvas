@@ -30,6 +30,7 @@ import type {
   SessionBundle,
 } from "@/src/features/sessions/types";
 import { syncBus } from "@/src/lib/sync-bus";
+import { useSession } from "@/src/providers/session-provider";
 
 /** Canonical query keys. Created ONCE here; later phases import, never redeclare. */
 export const sessionKeys = {
@@ -38,11 +39,12 @@ export const sessionKeys = {
   bundle: (sessionId: string) => ["sessions", "bundle", sessionId] as const,
 };
 
-/** Local sessions are not curried by userId; LocalStore holds anon (user_id=null) data unconditionally. */
+/** Sessions list scoped by current auth user: anon-only when signed out, owned sessions when signed in. */
 export function useSessionsList(): UseQueryResult<SessionSummary[], Error> {
+  const { user } = useSession();
   return useQuery({
-    queryKey: sessionKeys.list(null),
-    queryFn: () => listSessions(null),
+    queryKey: sessionKeys.list(user?.id ?? null),
+    queryFn: () => listSessions(user?.id ?? null),
   });
 }
 
