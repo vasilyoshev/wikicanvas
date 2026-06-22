@@ -34,18 +34,6 @@ function makeNode(overrides: Partial<Node> = {}): Node {
   };
 }
 
-function makeEdge(overrides: Partial<Edge> = {}): Edge {
-  return {
-    id: "e1",
-    sessionId: "s1",
-    sourceNodeId: "n1",
-    targetNodeId: "n2",
-    clickedLinkText: "Augustus",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    ...overrides,
-  };
-}
-
 function makeBundle(overrides: Partial<Session> = {}, nodes?: Node[], edges?: Edge[]): SyncBundle {
   const session = makeSession(overrides);
   return {

@@ -1,7 +1,7 @@
 // test/e2e/link-spawn.e2e.test.ts
 import { expect, test } from "@playwright/test";
 
-import { mockWikiProxy, seedBundle, type SeedBundle } from "./canvas-helpers";
+import { seedBundle, type SeedBundle } from "./canvas-helpers";
 
 // ── constants ────────────────────────────────────────────────────────────────
 const NOW = "2026-06-20T00:00:00.000Z";

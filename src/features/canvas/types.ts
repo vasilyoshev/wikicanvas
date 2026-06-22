@@ -1,6 +1,5 @@
 // src/features/canvas/types.ts
-import type { Node, Edge } from "@/src/features/sessions/types";
-import type { Viewport } from "@/src/features/sessions/types";
+import type { Node, Edge, Viewport } from "@/src/features/sessions/types";
 
 // Re-export the canonical Viewport (defined in sessions/types.ts, Phase 2) so
 // canvas code can import it from "@/src/features/canvas/types" without a second

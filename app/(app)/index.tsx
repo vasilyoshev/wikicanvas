@@ -1,3 +1,3 @@
-import SessionsListScreen from "@/src/features/sessions/SessionsListScreen";
+import { SessionsListScreen } from "@/src/features/sessions/SessionsListScreen";
 
 export default SessionsListScreen;

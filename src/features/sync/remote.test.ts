@@ -1,12 +1,8 @@
 // src/features/sync/remote.test.ts
-import { fetchRemoteBundles } from "@/src/features/sync/remote";
-import { requireSupabase } from "@/src/lib/supabase";
-
-// --- append to src/features/sync/remote.test.ts ---
-import { pushBundle } from "@/src/features/sync/remote";
+import { adoptAnonSessions, fetchRemoteBundles, pushBundle } from "@/src/features/sync/remote";
 import type { SyncBundle } from "@/src/features/sync/types";
 import { getLocalStore } from "@/src/lib/local-store";
-import { adoptAnonSessions } from "@/src/features/sync/remote";
+import { requireSupabase } from "@/src/lib/supabase";
 
 jest.mock("@/src/lib/supabase", () => ({
   requireSupabase: jest.fn(),

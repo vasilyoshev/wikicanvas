@@ -1,6 +1,6 @@
 // src/features/canvas/CanvasScreen.tsx
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
 import { useQueries } from "@tanstack/react-query";
 
 import { LoadingState, EmptyState } from "@/src/components/app/screen-state";
