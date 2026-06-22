@@ -27,3 +27,15 @@ export async function syncOnSignIn(userId: string): Promise<MergeResult> {
   await applyMergeResult(result);
   return result;
 }
+
+/** On opening a session while signed in: pull that session, merge, apply. */
+export async function syncSessionOnOpen(userId: string, sessionId: string): Promise<void> {
+  const remoteAll = await fetchRemoteBundles(userId);
+  const remote = remoteAll.filter((bundle) => bundle.session.id === sessionId);
+
+  const localBundle = await getLocalStore().getBundle(sessionId);
+  const local = localBundle ? [localBundle] : [];
+
+  const result = mergeSessions(local, remote);
+  await applyMergeResult(result);
+}

@@ -1,5 +1,5 @@
 // src/features/sync/orchestrator.test.ts
-import { syncOnSignIn } from "@/src/features/sync/orchestrator";
+import { syncOnSignIn, syncSessionOnOpen } from "@/src/features/sync/orchestrator";
 import { adoptAnonSessions, fetchRemoteBundles } from "@/src/features/sync/remote";
 import { mergeSessions } from "@/src/features/sync/merge";
 import { applyMergeResult } from "@/src/features/sync/apply";
@@ -92,5 +92,52 @@ describe("syncOnSignIn", () => {
 
     await syncOnSignIn("u1");
     expect(mockMerge).toHaveBeenCalledWith([bundle("s1")], [bundle("s1")]);
+  });
+});
+
+describe("syncSessionOnOpen", () => {
+  let getBundle: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getBundle = jest.fn();
+    mockGetLocalStore.mockReturnValue({
+      getBundle,
+    } as unknown as ReturnType<typeof getLocalStore>);
+    mockApply.mockResolvedValue(undefined);
+  });
+
+  it("merges the one local bundle against the matching remote bundle and applies", async () => {
+    getBundle.mockResolvedValue(bundle("s1"));
+    mockFetch.mockResolvedValue([bundle("s1"), bundle("s2")]);
+    const merged: MergeResult = { toUpload: [], toDownload: [bundle("s1")], unchanged: [] };
+    mockMerge.mockReturnValue(merged);
+
+    await syncSessionOnOpen("u1", "s1");
+
+    expect(mockFetch).toHaveBeenCalledWith("u1");
+    expect(getBundle).toHaveBeenCalledWith("s1");
+    // only the matching remote bundle (s1) and the single local bundle reach merge
+    expect(mockMerge).toHaveBeenCalledWith([bundle("s1")], [bundle("s1")]);
+    expect(mockApply).toHaveBeenCalledWith(merged);
+  });
+
+  it("treats a session absent locally as an empty local side (remote-only download)", async () => {
+    getBundle.mockResolvedValue(null);
+    mockFetch.mockResolvedValue([bundle("s1")]);
+    mockMerge.mockReturnValue({ toUpload: [], toDownload: [bundle("s1")], unchanged: [] });
+
+    await syncSessionOnOpen("u1", "s1");
+    expect(mockMerge).toHaveBeenCalledWith([], [bundle("s1")]);
+  });
+
+  it("is a no-op when the id exists on neither side", async () => {
+    getBundle.mockResolvedValue(null);
+    mockFetch.mockResolvedValue([bundle("other")]);
+    mockMerge.mockReturnValue({ toUpload: [], toDownload: [], unchanged: [] });
+
+    await syncSessionOnOpen("u1", "missing");
+    expect(mockMerge).toHaveBeenCalledWith([], []);
+    expect(mockApply).toHaveBeenCalledWith({ toUpload: [], toDownload: [], unchanged: [] });
   });
 });
