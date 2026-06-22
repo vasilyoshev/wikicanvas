@@ -27,12 +27,12 @@ export function mergeSessions(local: SyncBundle[], remote: SyncBundle[]): MergeR
     }
 
     seenRemote.add(id);
-    const localTs = localBundle.session.updatedAt;
-    const remoteTs = remoteBundle.session.updatedAt;
+    const localMs = Date.parse(localBundle.session.updatedAt);
+    const remoteMs = Date.parse(remoteBundle.session.updatedAt);
 
-    if (localTs > remoteTs) {
+    if (localMs > remoteMs) {
       result.toUpload.push(localBundle);
-    } else if (remoteTs > localTs) {
+    } else if (remoteMs > localMs) {
       result.toDownload.push(remoteBundle);
     } else if (bundlesEqual(localBundle, remoteBundle)) {
       // Identical timestamps AND identical content: a true no-op.

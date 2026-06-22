@@ -121,6 +121,46 @@ describe("row-mapping: sessions", () => {
     };
     expect(sessionRowToDomain(sessionToRow(deletedAnon))).toEqual(deletedAnon);
   });
+
+  it("normalizes a remote-style +00:00/microsecond updatedAt to canonical ...Z milliseconds", () => {
+    const remoteRow: SessionRow = {
+      ...sessionRow,
+      updated_at: "2026-06-22T10:00:00.662113+00:00",
+    };
+    const domain = sessionRowToDomain(remoteRow);
+    expect(domain.updatedAt).toBe("2026-06-22T10:00:00.662Z");
+  });
+
+  it("leaves a local ...Z updatedAt unchanged after normalization", () => {
+    const localRow: SessionRow = {
+      ...sessionRow,
+      updated_at: "2026-06-22T10:00:00.662Z",
+    };
+    const domain = sessionRowToDomain(localRow);
+    expect(domain.updatedAt).toBe("2026-06-22T10:00:00.662Z");
+  });
+
+  it("normalizes a remote-style +00:00/microsecond createdAt to canonical ...Z milliseconds", () => {
+    const remoteRow: SessionRow = {
+      ...sessionRow,
+      created_at: "2026-06-22T10:00:00.662113+00:00",
+    };
+    const domain = sessionRowToDomain(remoteRow);
+    expect(domain.createdAt).toBe("2026-06-22T10:00:00.662Z");
+  });
+
+  it("keeps deletedAt null when the row has no deletion timestamp", () => {
+    expect(sessionRowToDomain(sessionRow).deletedAt).toBeNull();
+  });
+
+  it("normalizes a remote-style +00:00/microsecond deletedAt to canonical ...Z milliseconds", () => {
+    const remoteRow: SessionRow = {
+      ...sessionRow,
+      deleted_at: "2026-06-22T10:00:00.662113+00:00",
+    };
+    const domain = sessionRowToDomain(remoteRow);
+    expect(domain.deletedAt).toBe("2026-06-22T10:00:00.662Z");
+  });
 });
 
 describe("row-mapping: nodes", () => {

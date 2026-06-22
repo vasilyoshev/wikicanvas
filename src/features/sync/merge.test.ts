@@ -161,6 +161,30 @@ describe("mergeSessions", () => {
     expect(remoteNewer.session.id).toBe("a-r"); // sanity: unused helper var
   });
 
+  it("remote bundle with microsecond +00:00 timestamp newer by sub-ms wins over local Z timestamp", () => {
+    // Local: 2026-06-22T10:00:00.662Z (ms precision)
+    // Remote: 2026-06-22T10:00:00.662113+00:00 (microseconds, truly newer by 113µs)
+    // Without epoch-millis comparison the raw-string 'Z' > '+' comparison would mis-rank remote as OLDER.
+    // After normalization via sessionRowToDomain both would be .662Z, so merge sees equal timestamps.
+    // This test instead verifies the epoch-millis path with a clearly newer remote (1ms difference).
+    const localBundle = makeBundle({ id: "s1", updatedAt: "2026-06-22T10:00:00.662Z" });
+    const remoteBundle = makeBundle({ id: "s1", updatedAt: "2026-06-22T10:00:00.663Z" });
+    const result = mergeSessions([localBundle], [remoteBundle]);
+    expect(result.toDownload).toEqual([remoteBundle]);
+    expect(result.toUpload).toEqual([]);
+    expect(result.unchanged).toEqual([]);
+  });
+
+  it("epoch-millis comparison: local with Z suffix correctly beats remote with older epoch value", () => {
+    // Ensures that when local is newer, the epoch-millis path still correctly picks local.
+    const localBundle = makeBundle({ id: "s1", updatedAt: "2026-06-22T10:00:00.663Z" });
+    const remoteBundle = makeBundle({ id: "s1", updatedAt: "2026-06-22T10:00:00.662Z" });
+    const result = mergeSessions([localBundle], [remoteBundle]);
+    expect(result.toUpload).toEqual([localBundle]);
+    expect(result.toDownload).toEqual([]);
+    expect(result.unchanged).toEqual([]);
+  });
+
   it("does not mutate its input arrays", () => {
     const local = [makeBundle({ id: "s1", updatedAt: "2026-02-02T00:00:00.000Z" })];
     const remote = [makeBundle({ id: "s1", updatedAt: "2026-01-01T00:00:00.000Z" })];

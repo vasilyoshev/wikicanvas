@@ -55,9 +55,9 @@ export function sessionRowToDomain(row: SessionRow): Session {
     viewportX: row.viewport_x,
     viewportY: row.viewport_y,
     viewportZoom: row.viewport_zoom,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    deletedAt: row.deleted_at,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+    deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
   };
 }
 
