@@ -4,6 +4,7 @@ import { AppState, Platform } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { validateRequiredEnv } from "@/src/lib/env";
+import { useSync } from "@/src/features/sync/use-sync";
 import { I18nProvider } from "@/src/providers/i18n-provider";
 import { SessionProvider } from "@/src/providers/session-provider";
 
@@ -27,6 +28,12 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Lives inside SessionProvider so useSession() resolves; drives sync as auth state flips. */
+function SyncGate({ children }: PropsWithChildren) {
+  useSync();
+  return <>{children}</>;
+}
+
 export function AppProviders({ children }: PropsWithChildren) {
   useEffect(() => {
     validateRequiredEnv();
@@ -36,7 +43,9 @@ export function AppProviders({ children }: PropsWithChildren) {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <I18nProvider>
-          <SessionProvider>{children}</SessionProvider>
+          <SessionProvider>
+            <SyncGate>{children}</SyncGate>
+          </SessionProvider>
         </I18nProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
