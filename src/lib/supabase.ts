@@ -32,6 +32,7 @@ export const supabase = hasSupabaseConfig
   ? createClient(appEnv.supabaseUrl, appEnv.supabaseKey, {
       auth: {
         storage,
+        storageKey: "wikicanvas-auth",
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,

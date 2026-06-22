@@ -8,7 +8,6 @@ import {
 } from "@/src/features/sync/orchestrator";
 import { sessionKeys } from "@/src/features/sessions/queries";
 import { queryClient } from "@/src/lib/query-client";
-import { setActiveUserId } from "@/src/lib/active-user";
 import { syncBus } from "@/src/lib/sync-bus";
 import { useSession } from "@/src/providers/session-provider";
 
@@ -41,22 +40,8 @@ export function startSyncForUser(userId: string): () => void {
  * Kick off Google sign-in from the "Sign in to sync" button or the (auth) flow.
  * Sync itself starts reactively in useSync when `user` becomes non-null (covering
  * both the web redirect-callback path and native in-app completion).
- *
- * E2E seam: if `__WIKICANVAS_FAKE_USER__` is set on globalThis (injected by the e2e
- * test via addInitScript), skip the real OAuth redirect and start sync directly so
- * headless-chromium tests can exercise the full local-first → sync handoff without a
- * Google round-trip.  The production path is unchanged when the flag is absent.
  */
 export async function runSyncSignIn(): Promise<void> {
-  const fakeUser = (globalThis as { __WIKICANVAS_FAKE_USER__?: string }).__WIKICANVAS_FAKE_USER__;
-  if (fakeUser) {
-    // e2e/test seam: skip the real OAuth redirect and start sync directly.
-    // Also update the active-user signal so SessionProvider reflects the signed-in state
-    // without a real Supabase auth event (enables useSessionsList to re-key by userId).
-    setActiveUserId(fakeUser);
-    startSyncForUser(fakeUser);
-    return;
-  }
   await signInWithGoogle();
 }
 

@@ -3,6 +3,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 import { seedSessions, type SeedSessionRow, type SeedNodeRow } from "./sessions-seed";
 
+const FAKE_USER_ID = "user-xyz";
+
 const ANON_SESSION: SeedSessionRow = {
   id: "00000000-0000-0000-0000-000000000001",
   user_id: null,
@@ -28,7 +30,7 @@ const ANON_NODE: SeedNodeRow = {
 };
 const REMOTE_SESSION: SeedSessionRow = {
   id: "00000000-0000-0000-0000-000000000002",
-  user_id: "user-xyz",
+  user_id: FAKE_USER_ID,
   title: "Remote Byzantine Empire",
   viewport_x: 0,
   viewport_y: 0,
@@ -38,8 +40,53 @@ const REMOTE_SESSION: SeedSessionRow = {
   deleted_at: null,
 };
 
-/** Intercept Supabase REST so sign-in resolves and the remote returns one extra session. */
+/** Build a synthesized supabase-js v2 session payload for localStorage seeding. */
+function makeFakeSupabaseSession() {
+  return {
+    access_token: "fake-access-token",
+    token_type: "bearer",
+    expires_at: Math.floor(Date.now() / 1000) + 999_999_999,
+    expires_in: 999_999_999,
+    refresh_token: "fake-refresh-token",
+    user: {
+      id: FAKE_USER_ID,
+      aud: "authenticated",
+      role: "authenticated",
+      email: "test@example.com",
+      app_metadata: {},
+      user_metadata: {},
+      created_at: "2024-01-01T00:00:00Z",
+    },
+  };
+}
+
+/**
+ * Intercept Supabase REST and auth so the fake session works end-to-end.
+ * Seeds a synthesized supabase-js v2 session into localStorage["wikicanvas-auth"]
+ * BEFORE app code runs, so supabase.auth.getSession() hydrates it and SessionProvider
+ * reports the signed-in user via its real path (session?.user).
+ */
 async function mockSupabase(page: Page) {
+  const fakeSession = makeFakeSupabaseSession();
+
+  // Seed the supabase-js session into localStorage BEFORE app code runs.
+  await page.addInitScript((sessionJson) => {
+    localStorage.setItem("wikicanvas-auth", JSON.stringify(sessionJson));
+  }, fakeSession);
+
+  // Auth endpoint: return the same session so token refresh/validation succeeds.
+  await page.route("**/auth/v1/**", (route) => {
+    if (route.request().method() === "OPTIONS") {
+      return route.fulfill({ status: 200 });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(fakeSession),
+    });
+  });
+
+  // REST mocks: remote returns one extra session (owned by FAKE_USER_ID); upserts succeed.
   await page.route("**/rest/v1/session**", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -57,22 +104,13 @@ async function mockSupabase(page: Page) {
   await page.route("**/rest/v1/edge**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
-  // Stub the auth flow: pressing sign-in injects a fake signed-in session.
-  await page.addInitScript(() => {
-    (window as unknown as { __WIKICANVAS_FAKE_USER__?: string }).__WIKICANVAS_FAKE_USER__ =
-      "user-xyz";
-  });
 }
 
 test.describe("auth-gated sync", () => {
   test("anonymous session is adopted and remote session is downloaded on sign-in", async ({
     page,
   }) => {
-    // Stub auth endpoints to avoid connection errors.
-    await page.route("**/auth/v1/**", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({}) }),
-    );
-
+    // mockSupabase seeds auth into localStorage (runs before app) and stubs REST/auth endpoints.
     await mockSupabase(page);
 
     // Navigate first so the app opens IndexedDB (establishing the schema).
@@ -82,15 +120,12 @@ test.describe("auth-gated sync", () => {
     // Seed the anonymous local session after the DB is ready.
     await seedSessions(page, { sessions: [ANON_SESSION], nodes: [ANON_NODE] });
 
-    // Reload so the app reads the seeded data fresh.
+    // Reload so the app reads both the seeded IndexedDB data and the pre-seeded auth session.
     await page.reload();
     await page.getByTestId("sessions-list-screen").waitFor({ timeout: 15_000 });
 
-    // Anonymous local session is visible with no login.
+    // Anonymous local session is visible (adopted by the signed-in user on sync).
     await expect(page.getByText("Local Roman Empire")).toBeVisible({ timeout: 10_000 });
-
-    // Trigger sign-in -> sync.
-    await page.getByTestId("sign-in-sync").click();
 
     // After merge: the remote-only session is now present locally too.
     await expect(page.getByText("Remote Byzantine Empire")).toBeVisible({ timeout: 15_000 });
