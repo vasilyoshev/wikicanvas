@@ -15,6 +15,9 @@ import {
 } from "@/src/features/sessions/queries";
 import * as localRepo from "@/src/features/sessions/local-repository";
 import { syncBus } from "@/src/lib/sync-bus";
+import { useSession } from "@/src/providers/session-provider";
+
+jest.mock("@/src/providers/session-provider", () => ({ useSession: jest.fn() }));
 
 jest.mock("@/src/features/sessions/local-repository", () => ({
   listSessions: jest.fn(),
@@ -48,7 +51,10 @@ describe("sessionKeys", () => {
 });
 
 describe("session mutations notify the sync-bus and invalidate", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useSession as jest.Mock).mockReturnValue({ user: null });
+  });
 
   it("useCreateSession returns the new session", async () => {
     (localRepo.createSession as jest.Mock).mockResolvedValue({
@@ -65,6 +71,26 @@ describe("session mutations notify the sync-bus and invalidate", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(session).toMatchObject({ id: "s-1" });
     expect(localRepo.createSession).toHaveBeenCalledWith(null, "Octopus", {
+      lang: "en",
+      articleTitle: "Octopus",
+    });
+  });
+
+  it("useCreateSession stamps the signed-in user id (not anonymous)", async () => {
+    (useSession as jest.Mock).mockReturnValue({ user: { id: "u-9" } });
+    (localRepo.createSession as jest.Mock).mockResolvedValue({
+      session: { id: "s-2", title: "Octopus" },
+      nodes: [],
+      edges: [],
+    });
+    const client = newClient();
+    const { result } = renderHook(() => useCreateSession(), { wrapper: makeWrapper(client) });
+    await result.current.mutateAsync({
+      title: "Octopus",
+      root: { lang: "en", articleTitle: "Octopus" },
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(localRepo.createSession).toHaveBeenCalledWith("u-9", "Octopus", {
       lang: "en",
       articleTitle: "Octopus",
     });

@@ -49,7 +49,7 @@ const config: ExpoConfig = {
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#f4eff7",
+      backgroundColor: "#7C3AED",
     },
     edgeToEdgeEnabled: true,
     package: "org.vasilyoshev.wikicanvas",

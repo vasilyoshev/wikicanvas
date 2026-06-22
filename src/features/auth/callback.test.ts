@@ -6,6 +6,7 @@ describe("parseAuthCallbackUrl", () => {
       code: "abc123",
       tokenHash: null,
       type: "recovery",
+      error: null,
       errorCode: null,
       errorDescription: null,
     });
@@ -23,6 +24,7 @@ describe("parseAuthCallbackUrl", () => {
       code: null,
       tokenHash: null,
       type: "signup",
+      error: null,
       errorCode: null,
       errorDescription: null,
     });
@@ -37,9 +39,18 @@ describe("parseAuthCallbackUrl", () => {
       code: null,
       tokenHash: "token123",
       type: "email",
+      error: null,
       errorCode: null,
       errorDescription: "Link expired",
     });
+  });
+
+  it("reads the bare OAuth `error` param", () => {
+    const parsed = parseAuthCallbackUrl(
+      "wikicanvas://auth-callback?error=access_denied&error_description=User+denied",
+    );
+    expect(parsed.error).toBe("access_denied");
+    expect(parsed.errorDescription).toBe("User denied");
   });
 });
 
@@ -77,6 +88,12 @@ describe("completeAuthRedirect", () => {
   it("returns password-recovery for a recovery link", async () => {
     const outcome = await completeAuthRedirect("wikicanvas://auth-callback?code=abc&type=recovery");
     expect(outcome).toBe("password-recovery");
+  });
+
+  it("rejects when the callback carries a bare OAuth error param", async () => {
+    await expect(
+      completeAuthRedirect("wikicanvas://auth-callback?error=access_denied"),
+    ).rejects.toThrow("access_denied");
   });
 
   // Security: a callback link carrying caller-supplied session tokens must NOT establish

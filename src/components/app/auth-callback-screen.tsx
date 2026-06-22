@@ -13,9 +13,12 @@ import { LoadingState } from "@/src/components/app/screen-state";
 export default function AuthCallbackScreen() {
   const { t } = useTranslation("common");
   const [error, setError] = useState<string | null>(null);
+  // Bumping this re-runs the redirect-completion effect — a real retry of the exchange.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let mounted = true;
+    setError(null);
     Linking.getInitialURL()
       .then(async (initialUrl) => {
         const url = initialUrl ?? (typeof window !== "undefined" ? window.location.href : null);
@@ -31,7 +34,7 @@ export default function AuthCallbackScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [attempt]);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -39,7 +42,7 @@ export default function AuthCallbackScreen() {
         {error ? (
           <>
             <Text className="text-center text-destructive">{error}</Text>
-            <Button onPress={() => router.replace("/(app)")} variant="secondary">
+            <Button onPress={() => setAttempt((n) => n + 1)} variant="secondary">
               <Text>{t("retry")}</Text>
             </Button>
           </>

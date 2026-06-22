@@ -13,7 +13,6 @@ export const STORE_ARTICLE_CACHE = "article_cache";
 /** IndexedDB index names (snake_case keyPaths). */
 export const INDEX_BY_USER = "by_user"; // sessions.user_id
 export const INDEX_BY_SESSION = "by_session"; // nodes.session_id / edges.session_id
-export const INDEX_BY_TARGET = "by_target"; // edges.target_node_id
 
 /**
  * SQLite DDL run once on first open (native adapter). Columns are snake_case to mirror the

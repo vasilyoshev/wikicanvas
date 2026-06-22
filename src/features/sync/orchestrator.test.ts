@@ -6,7 +6,12 @@ import {
   flushPendingPushes,
   BACKGROUND_PUSH_DEBOUNCE_MS,
 } from "@/src/features/sync/orchestrator";
-import { adoptAnonSessions, fetchRemoteBundles, pushBundle } from "@/src/features/sync/remote";
+import {
+  adoptAnonSessions,
+  fetchRemoteBundle,
+  fetchRemoteBundles,
+  pushBundle,
+} from "@/src/features/sync/remote";
 import { mergeSessions } from "@/src/features/sync/merge";
 import { applyMergeResult } from "@/src/features/sync/apply";
 import { getLocalStore } from "@/src/lib/local-store";
@@ -14,6 +19,7 @@ import type { SyncBundle, MergeResult } from "@/src/features/sync/types";
 
 jest.mock("@/src/features/sync/remote", () => ({
   adoptAnonSessions: jest.fn(),
+  fetchRemoteBundle: jest.fn(),
   fetchRemoteBundles: jest.fn(),
   pushBundle: jest.fn(),
 }));
@@ -23,6 +29,7 @@ jest.mock("@/src/lib/local-store", () => ({ getLocalStore: jest.fn() }));
 
 const mockAdopt = jest.mocked(adoptAnonSessions);
 const mockFetch = jest.mocked(fetchRemoteBundles);
+const mockFetchOne = jest.mocked(fetchRemoteBundle);
 const mockMerge = jest.mocked(mergeSessions);
 const mockApply = jest.mocked(applyMergeResult);
 const mockGetLocalStore = jest.mocked(getLocalStore);
@@ -115,24 +122,25 @@ describe("syncSessionOnOpen", () => {
     mockApply.mockResolvedValue(undefined);
   });
 
-  it("merges the one local bundle against the matching remote bundle and applies", async () => {
+  it("merges the one local bundle against the single fetched remote bundle and applies", async () => {
     getBundle.mockResolvedValue(bundle("s1"));
-    mockFetch.mockResolvedValue([bundle("s1"), bundle("s2")]);
+    mockFetchOne.mockResolvedValue(bundle("s1"));
     const merged: MergeResult = { toUpload: [], toDownload: [bundle("s1")], unchanged: [] };
     mockMerge.mockReturnValue(merged);
 
     await syncSessionOnOpen("u1", "s1");
 
-    expect(mockFetch).toHaveBeenCalledWith("u1");
+    // fetches ONLY this session (not the whole remote dataset)
+    expect(mockFetchOne).toHaveBeenCalledWith("u1", "s1");
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(getBundle).toHaveBeenCalledWith("s1");
-    // only the matching remote bundle (s1) and the single local bundle reach merge
     expect(mockMerge).toHaveBeenCalledWith([bundle("s1")], [bundle("s1")]);
     expect(mockApply).toHaveBeenCalledWith(merged);
   });
 
   it("treats a session absent locally as an empty local side (remote-only download)", async () => {
     getBundle.mockResolvedValue(null);
-    mockFetch.mockResolvedValue([bundle("s1")]);
+    mockFetchOne.mockResolvedValue(bundle("s1"));
     mockMerge.mockReturnValue({ toUpload: [], toDownload: [bundle("s1")], unchanged: [] });
 
     await syncSessionOnOpen("u1", "s1");
@@ -141,7 +149,7 @@ describe("syncSessionOnOpen", () => {
 
   it("is a no-op when the id exists on neither side", async () => {
     getBundle.mockResolvedValue(null);
-    mockFetch.mockResolvedValue([bundle("other")]);
+    mockFetchOne.mockResolvedValue(null);
     mockMerge.mockReturnValue({ toUpload: [], toDownload: [], unchanged: [] });
 
     await syncSessionOnOpen("u1", "missing");

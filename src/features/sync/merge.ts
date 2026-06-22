@@ -34,12 +34,22 @@ export function mergeSessions(local: SyncBundle[], remote: SyncBundle[]): MergeR
       result.toUpload.push(localBundle);
     } else if (remoteMs > localMs) {
       result.toDownload.push(remoteBundle);
-    } else if (bundlesEqual(localBundle, remoteBundle)) {
-      // Identical timestamps AND identical content: a true no-op.
-      result.unchanged.push(id);
     } else {
-      // Equal timestamps but diverged content: converge on remote.
-      result.toDownload.push(remoteBundle);
+      // Equal timestamps. A tombstone wins the tie so an equal-ms delete is never
+      // resurrected by the "remote wins" default below.
+      const localDeleted = localBundle.session.deletedAt != null;
+      const remoteDeleted = remoteBundle.session.deletedAt != null;
+      if (localDeleted && !remoteDeleted) {
+        result.toUpload.push(localBundle);
+      } else if (remoteDeleted && !localDeleted) {
+        result.toDownload.push(remoteBundle);
+      } else if (bundlesEqual(localBundle, remoteBundle)) {
+        // Identical timestamps AND identical content: a true no-op.
+        result.unchanged.push(id);
+      } else {
+        // Equal timestamps but diverged content: converge on remote.
+        result.toDownload.push(remoteBundle);
+      }
     }
   }
 

@@ -76,4 +76,39 @@ describe("AddArticleSearch", () => {
     // Give any async effect a tick; assert no search fired.
     await waitFor(() => expect(mockSearchTitles).not.toHaveBeenCalled());
   });
+
+  it("clears the box and closes the dropdown after selecting a suggestion", async () => {
+    mockSearchTitles.mockResolvedValue(results);
+    const onPick = jest.fn();
+    const { getByTestId, getByText, queryByText } = render(
+      <AddArticleSearch lang="en" onPick={onPick} />,
+    );
+
+    fireEvent.changeText(getByTestId("add-article-input"), "dog");
+    await waitFor(() => expect(getByText("Dog")).toBeTruthy());
+
+    fireEvent.press(getByText("Dog"));
+    expect(onPick).toHaveBeenCalledWith({ lang: "en", title: "Dog" });
+    expect(getByTestId("add-article-input").props.value).toBe("");
+    expect(queryByText("Dog")).toBeNull();
+  });
+
+  it("clears the input via the X button and closes the dropdown without picking", async () => {
+    mockSearchTitles.mockResolvedValue(results);
+    const onPick = jest.fn();
+    const { getByTestId, getByText, queryByText, queryByTestId } = render(
+      <AddArticleSearch lang="en" onPick={onPick} />,
+    );
+
+    fireEvent.changeText(getByTestId("add-article-input"), "dog");
+    await waitFor(() => expect(getByText("Dog")).toBeTruthy());
+    expect(getByTestId("add-article-clear")).toBeTruthy();
+
+    fireEvent.press(getByTestId("add-article-clear"));
+    expect(getByTestId("add-article-input").props.value).toBe("");
+    expect(queryByText("Dog")).toBeNull();
+    // The X only shows when there is text.
+    expect(queryByTestId("add-article-clear")).toBeNull();
+    expect(onPick).not.toHaveBeenCalled();
+  });
 });

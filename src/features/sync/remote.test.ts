@@ -1,5 +1,10 @@
 // src/features/sync/remote.test.ts
-import { adoptAnonSessions, fetchRemoteBundles, pushBundle } from "@/src/features/sync/remote";
+import {
+  adoptAnonSessions,
+  fetchRemoteBundle,
+  fetchRemoteBundles,
+  pushBundle,
+} from "@/src/features/sync/remote";
 import type { SyncBundle } from "@/src/features/sync/types";
 import { getLocalStore } from "@/src/lib/local-store";
 import { requireSupabase } from "@/src/lib/supabase";
@@ -114,6 +119,54 @@ describe("fetchRemoteBundles", () => {
   });
 });
 
+/** Fake client for the single-session fetch chain: session via select().eq().eq().maybeSingle(). */
+function fakeOneClient(
+  sessionData: { data: unknown; error: unknown },
+  nodeData: { data: unknown[]; error: unknown },
+  edgeData: { data: unknown[]; error: unknown },
+) {
+  const from = jest.fn((table: string) => {
+    if (table === "session") {
+      const maybeSingle = jest.fn().mockResolvedValue(sessionData);
+      const eqId = jest.fn(() => ({ maybeSingle }));
+      const eqUser = jest.fn(() => ({ eq: eqId }));
+      return { select: jest.fn(() => ({ eq: eqUser })) };
+    }
+    const eq = jest.fn().mockResolvedValue(table === "node" ? nodeData : edgeData);
+    return { select: jest.fn(() => ({ eq })) };
+  });
+  return { from } as unknown as ReturnType<typeof requireSupabase>;
+}
+
+describe("fetchRemoteBundle", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns null when the session is absent for that user", async () => {
+    mockRequireSupabase.mockReturnValue(
+      fakeOneClient(
+        { data: null, error: null },
+        { data: [], error: null },
+        { data: [], error: null },
+      ),
+    );
+    await expect(fetchRemoteBundle("u1", "s1")).resolves.toBeNull();
+  });
+
+  it("returns the single session's mapped bundle", async () => {
+    mockRequireSupabase.mockReturnValue(
+      fakeOneClient(
+        { data: sessionRow, error: null },
+        { data: [nodeRow], error: null },
+        { data: [edgeRow], error: null },
+      ),
+    );
+    const result = await fetchRemoteBundle("u1", "s1");
+    expect(result?.session).toMatchObject({ id: "s1", userId: "u1" });
+    expect(result?.nodes[0]).toMatchObject({ id: "n1", sessionId: "s1" });
+    expect(result?.edges[0]).toMatchObject({ id: "e1", sessionId: "s1" });
+  });
+});
+
 function makeBundle(): SyncBundle {
   return {
     session: {
@@ -157,12 +210,14 @@ function makeBundle(): SyncBundle {
 describe("pushBundle", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("upserts the session row, deletes then upserts child rows, omitting user_id on children", async () => {
+  it("upserts session + children first, then deletes stale child rows, omitting user_id on children", async () => {
     const sessionUpsert = jest.fn().mockResolvedValue({ error: null });
     const nodeUpsert = jest.fn().mockResolvedValue({ error: null });
     const edgeUpsert = jest.fn().mockResolvedValue({ error: null });
-    const nodeDeleteEq = jest.fn().mockResolvedValue({ error: null });
-    const edgeDeleteEq = jest.fn().mockResolvedValue({ error: null });
+    const nodeNot = jest.fn().mockResolvedValue({ error: null });
+    const edgeNot = jest.fn().mockResolvedValue({ error: null });
+    const nodeDeleteEq = jest.fn(() => ({ not: nodeNot }));
+    const edgeDeleteEq = jest.fn(() => ({ not: edgeNot }));
     const nodeDelete = jest.fn(() => ({ eq: nodeDeleteEq }));
     const edgeDelete = jest.fn(() => ({ eq: edgeDeleteEq }));
 
@@ -180,10 +235,6 @@ describe("pushBundle", () => {
     expect(sessionUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ id: "s1", user_id: "u1", viewport_zoom: 1 }),
     );
-    // children deleted by session_id then re-inserted
-    expect(nodeDelete).toHaveBeenCalled();
-    expect(nodeDeleteEq).toHaveBeenCalledWith("session_id", "s1");
-    expect(edgeDeleteEq).toHaveBeenCalledWith("session_id", "s1");
 
     const nodePayload = nodeUpsert.mock.calls[0][0][0];
     expect(nodePayload).toMatchObject({
@@ -196,6 +247,12 @@ describe("pushBundle", () => {
     const edgePayload = edgeUpsert.mock.calls[0][0][0];
     expect(edgePayload).toMatchObject({ id: "e1", session_id: "s1", source_node_id: "n1" });
     expect(edgePayload).not.toHaveProperty("user_id");
+
+    // stale children removed by session_id, excluding the ids still in the bundle
+    expect(edgeDeleteEq).toHaveBeenCalledWith("session_id", "s1");
+    expect(edgeNot).toHaveBeenCalledWith("id", "in", "(e1)");
+    expect(nodeDeleteEq).toHaveBeenCalledWith("session_id", "s1");
+    expect(nodeNot).toHaveBeenCalledWith("id", "in", "(n1)");
   });
 
   it("throws when the session upsert errors", async () => {

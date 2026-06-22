@@ -9,6 +9,7 @@ import { appEnv } from "@/src/lib/env";
 
 import { ConfirmDialog } from "@/src/components/app/confirm-dialog";
 import { EmptyState, LoadingState } from "@/src/components/app/screen-state";
+import { ThemeToggle } from "@/src/components/app/theme-toggle";
 import { Button } from "@/src/components/react-native-reusables/button";
 import { Card } from "@/src/components/react-native-reusables/card";
 import { Icon } from "@/src/components/react-native-reusables/icon";
@@ -29,7 +30,7 @@ import { useSession } from "@/src/providers/session-provider";
 export function SessionsListScreen() {
   const { t } = useTranslation("common");
   const { user } = useSession();
-  const { data: summaries, isLoading } = useSessionsList();
+  const { data: summaries, isLoading, isError, refetch } = useSessionsList();
   const createSession = useCreateSession();
   const renameSession = useRenameSession();
   const deleteSession = useDeleteSession();
@@ -55,11 +56,16 @@ export function SessionsListScreen() {
 
   const handlePick = async (pick: { lang: string; title: string }) => {
     setSearchOpen(false);
-    const session = await createSession.mutateAsync({
-      title: pick.title,
-      root: { lang: pick.lang, articleTitle: pick.title },
-    });
-    openSession(session.id);
+    try {
+      const session = await createSession.mutateAsync({
+        title: pick.title,
+        root: { lang: pick.lang, articleTitle: pick.title },
+      });
+      openSession(session.id);
+    } catch (error) {
+      // Don't navigate on failure; surface instead of becoming an unhandled rejection.
+      console.warn("[sessions] create failed", error);
+    }
   };
 
   const beginRename = (sessionId: string) => {
@@ -93,19 +99,31 @@ export function SessionsListScreen() {
       <ScrollView contentContainerClassName="grow gap-6 p-4">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-2xl font-bold">Your sessions</Text>
-          {user ? (
-            <Button testID="sign-out" variant="secondary" onPress={handleSignOut}>
-              <Text>Sign out</Text>
-            </Button>
-          ) : (
-            <Button testID="sign-in-sync" variant="secondary" onPress={handleSignInToSync}>
-              <Text>Sign in to sync</Text>
-            </Button>
-          )}
+          <View className="flex-row items-center gap-2">
+            <ThemeToggle />
+            {user ? (
+              <Button testID="sign-out" variant="secondary" onPress={handleSignOut}>
+                <Text>Sign out</Text>
+              </Button>
+            ) : (
+              <Button testID="sign-in-sync" variant="secondary" onPress={handleSignInToSync}>
+                <Text>Sign in to sync</Text>
+              </Button>
+            )}
+          </View>
         </View>
 
         {isLoading ? (
           <LoadingState label="Loading your sessions" />
+        ) : isError ? (
+          <View testID="sessions-error" className="items-center gap-3 py-10">
+            <Text variant="muted" className="text-center">
+              Couldn&apos;t load your sessions.
+            </Text>
+            <Button testID="sessions-retry" variant="secondary" onPress={() => void refetch()}>
+              <Text>Retry</Text>
+            </Button>
+          </View>
         ) : (
           <View className="flex-row flex-wrap gap-4">
             <Pressable

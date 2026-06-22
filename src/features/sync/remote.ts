@@ -53,6 +53,34 @@ export async function fetchRemoteBundles(userId: string): Promise<SyncBundle[]> 
   }));
 }
 
+/** Pull a single session's bundle from Supabase (incl. tombstone), or null if absent. */
+export async function fetchRemoteBundle(
+  userId: string,
+  sessionId: string,
+): Promise<SyncBundle | null> {
+  const client = requireSupabase();
+
+  const sessionRes = await client
+    .from("session")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (sessionRes.error) throw sessionRes.error;
+  if (!sessionRes.data) return null;
+
+  const nodesRes = await client.from("node").select("*").eq("session_id", sessionId);
+  if (nodesRes.error) throw nodesRes.error;
+  const edgesRes = await client.from("edge").select("*").eq("session_id", sessionId);
+  if (edgesRes.error) throw edgesRes.error;
+
+  return {
+    session: sessionRowToDomain(sessionRes.data as SessionRow),
+    nodes: ((nodesRes.data ?? []) as NodeRow[]).map(nodeRowToDomain),
+    edges: ((edgesRes.data ?? []) as EdgeRow[]).map(edgeRowToDomain),
+  };
+}
+
 /** Adopt anon LocalStore sessions: stamp user_id locally; returns adopted bundles ready to push. */
 export async function adoptAnonSessions(userId: string): Promise<SyncBundle[]> {
   const store = getLocalStore();
@@ -74,13 +102,15 @@ export async function pushBundle(bundle: SyncBundle): Promise<void> {
   const sessionRes = await client.from("session").upsert(sessionToRow(bundle.session));
   if (sessionRes.error) throw sessionRes.error;
 
-  // Replace-wholesale: clear existing children, then re-insert. Edges deleted before
-  // nodes (edge FK -> node); re-inserted nodes-first so edge FK targets exist.
-  const edgeDel = await client.from("edge").delete().eq("session_id", sessionId);
-  if (edgeDel.error) throw edgeDel.error;
-  const nodeDel = await client.from("node").delete().eq("session_id", sessionId);
-  if (nodeDel.error) throw nodeDel.error;
+  const nodeIds = bundle.nodes.map((n) => n.id);
+  const edgeIds = bundle.edges.map((e) => e.id);
 
+  // Upsert the CURRENT children first (nodes before edges, for the edge->node FK),
+  // THEN delete only the rows no longer in the bundle. Ordering this way means a
+  // mid-sequence failure can only leave EXTRA (stale) rows on the server — never
+  // missing ones — so a half-finished push can't truncate a session and have that
+  // loss propagate to the user's other devices via the next download. (The previous
+  // delete-then-insert order left a wipe-then-crash window.)
   if (bundle.nodes.length > 0) {
     const nodeRes = await client.from("node").upsert(bundle.nodes.map(nodeToRow));
     if (nodeRes.error) throw nodeRes.error;
@@ -89,4 +119,18 @@ export async function pushBundle(bundle: SyncBundle): Promise<void> {
     const edgeRes = await client.from("edge").upsert(bundle.edges.map(edgeToRow));
     if (edgeRes.error) throw edgeRes.error;
   }
+
+  // Remove stale rows (edges before nodes for the FK). With an empty current set,
+  // delete all of that kind for the session.
+  const staleEdges = client.from("edge").delete().eq("session_id", sessionId);
+  const edgeDel = await (edgeIds.length > 0
+    ? staleEdges.not("id", "in", `(${edgeIds.join(",")})`)
+    : staleEdges);
+  if (edgeDel.error) throw edgeDel.error;
+
+  const staleNodes = client.from("node").delete().eq("session_id", sessionId);
+  const nodeDel = await (nodeIds.length > 0
+    ? staleNodes.not("id", "in", `(${nodeIds.join(",")})`)
+    : staleNodes);
+  if (nodeDel.error) throw nodeDel.error;
 }

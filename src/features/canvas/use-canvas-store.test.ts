@@ -20,6 +20,16 @@ describe("useCanvasStore", () => {
     expect(useCanvasStore.getState().viewport).toEqual({ x: 10, y: 20, zoom: 4 });
   });
 
+  it("setScroll records a per-node offset (rounded, non-negative) that survives reset", () => {
+    useCanvasStore.getState().setScroll("n1", 240.6);
+    expect(useCanvasStore.getState().scrollByNodeId.n1).toBe(241);
+    useCanvasStore.getState().setScroll("n2", -5);
+    expect(useCanvasStore.getState().scrollByNodeId.n2).toBe(0);
+    // Reading position must outlive leaving the session so a re-mount can restore it.
+    useCanvasStore.getState().reset();
+    expect(useCanvasStore.getState().scrollByNodeId.n1).toBe(241);
+  });
+
   it("selectNode sets selection and brings it to front", () => {
     useCanvasStore.getState().setNodeOrder(["a", "b", "c"]);
     useCanvasStore.getState().selectNode("a");
@@ -65,16 +75,32 @@ describe("useCanvasStore", () => {
     expect(next.resizingNodeId).toBe("c");
   });
 
-  it("reset returns to initial state", () => {
+  it("syncNodeOrder keeps existing z-order, appends new ids, and drops removed ids", () => {
+    useCanvasStore.getState().setNodeOrder(["a", "b", "c"]);
+    useCanvasStore.getState().bringToFront("a"); // order: b, c, a
+    useCanvasStore.getState().syncNodeOrder(["a", "b", "d"]); // c removed, d added
+    expect(useCanvasStore.getState().nodeOrder).toEqual(["b", "a", "d"]);
+  });
+
+  it("setLiveBounds and clearLiveBounds track in-gesture geometry", () => {
+    useCanvasStore.getState().setLiveBounds("a", { x: 1, y: 2, width: 300, height: 400 });
+    expect(useCanvasStore.getState().liveBounds.a).toEqual({ x: 1, y: 2, width: 300, height: 400 });
+    useCanvasStore.getState().clearLiveBounds("a");
+    expect(useCanvasStore.getState().liveBounds.a).toBeUndefined();
+  });
+
+  it("reset returns to initial state and clears live bounds", () => {
     const s = useCanvasStore.getState();
     s.setViewport({ x: 5, y: 5, zoom: 2 });
     s.selectNode("a");
     s.markNew("a");
+    s.setLiveBounds("a", { x: 1, y: 2, width: 300, height: 400 });
     s.reset();
     const next = useCanvasStore.getState();
     expect(next.viewport).toEqual({ x: 0, y: 0, zoom: 1 });
     expect(next.selectedNodeId).toBeNull();
     expect(next.newNodeIds.size).toBe(0);
     expect(next.nodeOrder).toEqual([]);
+    expect(next.liveBounds).toEqual({});
   });
 });

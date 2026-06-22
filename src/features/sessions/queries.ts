@@ -17,6 +17,7 @@ import {
   updateNodeGeometry,
   addNode,
   addEdge,
+  deleteNode,
 } from "@/src/features/sessions/local-repository";
 import type {
   Session,
@@ -66,9 +67,12 @@ export function useCreateSession(): UseMutationResult<
   { title: string; root: { lang: string; articleTitle: string } }
 > {
   const queryClient = useQueryClient();
+  const { user } = useSession();
   return useMutation({
     mutationFn: async ({ title, root }) => {
-      const bundle = await createSession(null, title, root);
+      // Stamp the current owner so a signed-in user's new session is theirs (shows
+      // in their list, syncs to their account) — not an orphaned anonymous row.
+      const bundle = await createSession(user?.id ?? null, title, root);
       return bundle.session;
     },
     onSuccess: (session) => {
@@ -129,9 +133,19 @@ export function useUpdateNodeGeometry(): UseMutationResult<
   Error,
   { sessionId: string; nodeId: string; geom: NodeGeometry }
 > {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ sessionId, nodeId, geom }) => {
       await updateNodeGeometry(sessionId, nodeId, geom);
+    },
+    // Optimistically advance the cached bundle so the node keeps its committed
+    // geometry the instant the in-gesture live override is cleared (no snap-back).
+    onMutate: ({ sessionId, nodeId, geom }) => {
+      queryClient.setQueryData<SessionBundle>(sessionKeys.bundle(sessionId), (old) =>
+        old
+          ? { ...old, nodes: old.nodes.map((n) => (n.id === nodeId ? { ...n, ...geom } : n)) }
+          : old,
+      );
     },
     onSuccess: (_data, { sessionId }) => {
       syncBus.notify(sessionId);
@@ -155,6 +169,36 @@ export function useAddNode(): UseMutationResult<
   });
 }
 
+export function useDeleteNode(): UseMutationResult<
+  void,
+  Error,
+  { sessionId: string; nodeId: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, nodeId }) => deleteNode(sessionId, nodeId),
+    // Optimistically drop the node (and its edges) so the window disappears instantly.
+    onMutate: ({ sessionId, nodeId }) => {
+      queryClient.setQueryData<SessionBundle>(sessionKeys.bundle(sessionId), (old) =>
+        old
+          ? {
+              ...old,
+              nodes: old.nodes.filter((n) => n.id !== nodeId),
+              edges: old.edges.filter(
+                (e) => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId,
+              ),
+            }
+          : old,
+      );
+    },
+    onSuccess: (_data, { sessionId }) => {
+      syncBus.notify(sessionId);
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.bundle(sessionId) });
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.all });
+    },
+  });
+}
+
 export function useAddEdge(): UseMutationResult<
   Edge,
   Error,
@@ -166,6 +210,9 @@ export function useAddEdge(): UseMutationResult<
     onSuccess: (_edge, { sessionId }) => {
       syncBus.notify(sessionId);
       void queryClient.invalidateQueries({ queryKey: sessionKeys.bundle(sessionId) });
+      // addEdge bumps the session clock; refresh the list so the "edited …" label
+      // and ordering stay current after an edge-only (de-duped) link spawn.
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.all });
     },
   });
 }

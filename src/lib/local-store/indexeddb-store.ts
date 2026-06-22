@@ -41,14 +41,25 @@ export class IndexedDBLocalStore implements LocalStore {
 
   constructor() {
     this.dbPromise = openDB<WikiCanvasDB>(DB_NAME, DB_VERSION, {
+      // Idempotent: only create stores that don't already exist. A future DB_VERSION
+      // bump re-runs this against an existing DB; unconditional createObjectStore
+      // would throw ConstraintError and brick existing web users.
       upgrade(db) {
-        const sessions = db.createObjectStore(STORE_SESSIONS, { keyPath: "id" });
-        sessions.createIndex(INDEX_BY_USER, "user_id");
-        const nodes = db.createObjectStore(STORE_NODES, { keyPath: "id" });
-        nodes.createIndex(INDEX_BY_SESSION, "session_id");
-        const edges = db.createObjectStore(STORE_EDGES, { keyPath: "id" });
-        edges.createIndex(INDEX_BY_SESSION, "session_id");
-        db.createObjectStore(STORE_ARTICLE_CACHE, { keyPath: "lang_title" });
+        if (!db.objectStoreNames.contains(STORE_SESSIONS)) {
+          const sessions = db.createObjectStore(STORE_SESSIONS, { keyPath: "id" });
+          sessions.createIndex(INDEX_BY_USER, "user_id");
+        }
+        if (!db.objectStoreNames.contains(STORE_NODES)) {
+          const nodes = db.createObjectStore(STORE_NODES, { keyPath: "id" });
+          nodes.createIndex(INDEX_BY_SESSION, "session_id");
+        }
+        if (!db.objectStoreNames.contains(STORE_EDGES)) {
+          const edges = db.createObjectStore(STORE_EDGES, { keyPath: "id" });
+          edges.createIndex(INDEX_BY_SESSION, "session_id");
+        }
+        if (!db.objectStoreNames.contains(STORE_ARTICLE_CACHE)) {
+          db.createObjectStore(STORE_ARTICLE_CACHE, { keyPath: "lang_title" });
+        }
       },
     });
   }
@@ -91,9 +102,15 @@ export class IndexedDBLocalStore implements LocalStore {
 
   async deleteSessionDeep(id: string): Promise<void> {
     const db = await this.db();
-    await this.deleteNodesForSession(id);
-    await this.deleteEdgesForSession(id);
-    await db.delete(STORE_SESSIONS, id);
+    // One transaction across all three stores so the deep delete is all-or-nothing
+    // (mirrors the SQLite FK cascade); a partial failure can't orphan node/edge rows.
+    const tx = db.transaction([STORE_SESSIONS, STORE_NODES, STORE_EDGES], "readwrite");
+    const nodes = tx.objectStore(STORE_NODES);
+    const edges = tx.objectStore(STORE_EDGES);
+    for (const key of await nodes.index(INDEX_BY_SESSION).getAllKeys(id)) await nodes.delete(key);
+    for (const key of await edges.index(INDEX_BY_SESSION).getAllKeys(id)) await edges.delete(key);
+    await tx.objectStore(STORE_SESSIONS).delete(id);
+    await tx.done;
   }
 
   async listNodes(sessionId: string): Promise<Node[]> {
@@ -137,12 +154,21 @@ export class IndexedDBLocalStore implements LocalStore {
   }
 
   async replaceBundle(bundle: SessionBundle): Promise<void> {
+    const db = await this.db();
     const id = bundle.session.id;
-    await this.deleteNodesForSession(id);
-    await this.deleteEdgesForSession(id);
-    await this.upsertSession(bundle.session);
-    await Promise.all(bundle.nodes.map((n) => this.upsertNode(n)));
-    await Promise.all(bundle.edges.map((e) => this.upsertEdge(e)));
+    // Single readwrite transaction across all three stores: the browser rolls the
+    // whole thing back on any failure, so an interrupted sync-download can never
+    // leave the session with its children deleted but the new ones missing. This
+    // honours the "atomic wholesale replace" contract and matches the SQLite path.
+    const tx = db.transaction([STORE_SESSIONS, STORE_NODES, STORE_EDGES], "readwrite");
+    const nodes = tx.objectStore(STORE_NODES);
+    const edges = tx.objectStore(STORE_EDGES);
+    for (const key of await nodes.index(INDEX_BY_SESSION).getAllKeys(id)) await nodes.delete(key);
+    for (const key of await edges.index(INDEX_BY_SESSION).getAllKeys(id)) await edges.delete(key);
+    await tx.objectStore(STORE_SESSIONS).put(sessionToRow(bundle.session));
+    for (const n of bundle.nodes) await nodes.put(nodeToRow(n));
+    for (const e of bundle.edges) await edges.put(edgeToRow(e));
+    await tx.done;
   }
 
   async getCacheEntry(key: string): Promise<CacheEntry | null> {
@@ -156,11 +182,22 @@ export class IndexedDBLocalStore implements LocalStore {
 
   async adoptAnonymousSessions(userId: string): Promise<string[]> {
     const db = await this.db();
-    // getAll + filter (never the by_user index, which omits null keys).
-    const all = await db.getAll(STORE_SESSIONS);
-    const anon = all.filter((r) => r.user_id === null);
-    await Promise.all(anon.map((r) => db.put(STORE_SESSIONS, { ...r, user_id: userId })));
-    return anon.map((r) => r.id);
+    // One transaction: cursor over anonymous rows and stamp them in place, so adoption
+    // is all-or-nothing (never a split owned/anonymous state) and the returned ids
+    // describe exactly what committed. Matches the single-statement SQLite UPDATE.
+    const tx = db.transaction(STORE_SESSIONS, "readwrite");
+    const store = tx.objectStore(STORE_SESSIONS);
+    const ids: string[] = [];
+    let cursor = await store.openCursor();
+    while (cursor) {
+      if (cursor.value.user_id === null) {
+        ids.push(cursor.value.id);
+        await cursor.update({ ...cursor.value, user_id: userId });
+      }
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    return ids;
   }
 }
 

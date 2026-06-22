@@ -16,6 +16,7 @@ jest.mock("@/src/features/sessions/queries", () => ({
   useUpdateNodeGeometry: jest.fn(() => ({ mutate: jest.fn() })),
   useAddNode: jest.fn(() => ({ mutateAsync: jest.fn() })),
   useAddEdge: jest.fn(() => ({ mutateAsync: jest.fn() })),
+  useDeleteNode: jest.fn(() => ({ mutate: jest.fn() })),
 }));
 // CanvasBoard pulls Skia/gesture-handler; stub it to a no-op so the screen renders in jest.
 jest.mock("@/src/features/canvas/CanvasBoard", () => ({ CanvasBoard: () => null }));
@@ -32,9 +33,12 @@ jest.mock("@/src/features/canvas/use-canvas-store", () => ({
       viewport: { x: 0, y: 0, zoom: 1 },
       setViewport: jest.fn(),
       setNodeOrder: jest.fn(),
+      syncNodeOrder: jest.fn(),
       reset: jest.fn(),
       bringToFront: jest.fn(),
       markNew: jest.fn(),
+      clearNew: jest.fn(),
+      newNodeIds: new Set<string>(),
       selectNode: jest.fn(),
     }),
   ),

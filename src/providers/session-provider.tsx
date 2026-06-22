@@ -1,4 +1,11 @@
-import { createContext, type PropsWithChildren, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  type PropsWithChildren,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Session, User } from "@supabase/supabase-js";
 
@@ -63,12 +70,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, [queryClient]);
 
-  const value: SessionContextValue = {
-    hasSupabaseConfig,
-    session,
-    status,
-    user: session?.user ?? null,
-  };
+  // Memoized so consumers don't re-render on every SessionProvider render — only when
+  // the session/status actually change (hasSupabaseConfig is a module constant).
+  const value = useMemo<SessionContextValue>(
+    () => ({ hasSupabaseConfig, session, status, user: session?.user ?? null }),
+    [session, status],
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

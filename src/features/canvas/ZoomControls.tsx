@@ -18,16 +18,40 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onResetZoom, onFit }: 
   const percent = `${Math.round(zoom * 100)}%`;
   return (
     <View className="flex-row items-center gap-1 rounded-lg border border-border bg-card p-1">
-      <Button testID="zoom-out" variant="ghost" size="icon" onPress={onZoomOut}>
+      <Button
+        testID="zoom-out"
+        variant="ghost"
+        size="icon"
+        accessibilityLabel="Zoom out"
+        onPress={onZoomOut}
+      >
         <Icon name="remove" className="size-5 text-foreground" />
       </Button>
-      <Button testID="zoom-reset" variant="ghost" size="sm" onPress={onResetZoom}>
+      <Button
+        testID="zoom-reset"
+        variant="ghost"
+        size="sm"
+        accessibilityLabel={`Zoom ${percent}, tap to reset to 100%`}
+        onPress={onResetZoom}
+      >
         <Text className="tabular-nums">{percent}</Text>
       </Button>
-      <Button testID="zoom-in" variant="ghost" size="icon" onPress={onZoomIn}>
+      <Button
+        testID="zoom-in"
+        variant="ghost"
+        size="icon"
+        accessibilityLabel="Zoom in"
+        onPress={onZoomIn}
+      >
         <Icon name="add" className="size-5 text-foreground" />
       </Button>
-      <Button testID="zoom-fit" variant="ghost" size="icon" onPress={onFit}>
+      <Button
+        testID="zoom-fit"
+        variant="ghost"
+        size="icon"
+        accessibilityLabel="Fit to content"
+        onPress={onFit}
+      >
         <Icon name="fit-screen" className="size-5 text-foreground" />
       </Button>
     </View>

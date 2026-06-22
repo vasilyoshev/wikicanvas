@@ -21,6 +21,14 @@ describe("buildInterceptorScript", () => {
     expect(script).toContain("fragment");
   });
 
+  it("captures scroll and restores the requested initial offset", () => {
+    expect(script).toContain('addEventListener("scroll"');
+    expect(buildInterceptorScript("en")).toContain("INITIAL_SCROLL = 0");
+    const withOffset = buildInterceptorScript("en", 320);
+    expect(withOffset).toContain("INITIAL_SCROLL = 320");
+    expect(withOffset).toContain("scrollTo");
+  });
+
   // Execute the embedded pure classifier to prove it mirrors links.ts.
   // The script defines a global function __wcClassify(href, lang) for testability.
   function runClassify(href: string): unknown {

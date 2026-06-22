@@ -1,4 +1,5 @@
 import * as React from "react";
+import { memo } from "react";
 import { Linking, Pressable, View } from "react-native";
 
 import ArticleHtml from "@/src/features/wikipedia/ArticleHtml";
@@ -7,6 +8,7 @@ import type { InterceptorMessage } from "@/src/features/wikipedia/messages";
 import { Text } from "@/src/components/react-native-reusables/text";
 import { Button } from "@/src/components/react-native-reusables/button";
 import { Icon } from "@/src/components/react-native-reusables/icon";
+import { useResolvedColorScheme } from "@/src/lib/color-scheme";
 
 export interface ArticleWindowProps {
   article: ArticleResult;
@@ -14,28 +16,39 @@ export interface ArticleWindowProps {
   fullscreen?: boolean;
   onToggleFullscreen?: () => void;
   onClose?: () => void;
+  /** Saved scroll offset (px) restored when the article mounts. */
+  initialScrollY?: number;
+  /** Reports the article's scroll position so the host can persist it. */
+  onScroll?: (scrollY: number) => void;
   onMessage: (message: InterceptorMessage, sourceNodeId: string) => void;
 }
 
-export default function ArticleWindow({
+function ArticleWindowImpl({
   article,
   nodeId,
   fullscreen = false,
   onToggleFullscreen,
   onClose,
+  initialScrollY,
+  onScroll,
   onMessage,
 }: ArticleWindowProps) {
+  const theme = useResolvedColorScheme();
   const openSource = React.useCallback(() => {
     void Linking.openURL(article.sourceUrl);
   }, [article.sourceUrl]);
 
   return (
-    <View className="flex-1 overflow-hidden rounded-lg border border-border bg-background">
+    <View
+      className={`flex-1 bg-background ${
+        fullscreen ? "" : "overflow-hidden rounded-lg border border-border"
+      }`}
+    >
       {/* Header chrome — always visible */}
       <View className="flex-row items-center gap-2 border-b border-border px-3 py-2">
-        {/* Wikipedia "W" mark — sole attribution in card mode, also present in fullscreen */}
+        {/* Wikipedia "W" mark — the per-article link to the source, in both modes. */}
         <Pressable
-          testID="article-window-source"
+          testID={`article-window-source-${nodeId}`}
           accessibilityRole="link"
           accessibilityLabel="View on Wikipedia"
           onPress={openSource}
@@ -49,20 +62,23 @@ export default function ArticleWindow({
         </Text>
 
         {onToggleFullscreen != null ? (
+          // Windowed toggle: expand to fullscreen / restore back to the card. This only
+          // ever changes the window's size — it never closes the node.
           <Button
-            testID="article-window-fullscreen"
+            testID={`article-window-fullscreen-${nodeId}`}
             variant="ghost"
             size="icon"
-            accessibilityLabel="Toggle fullscreen"
+            accessibilityLabel={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             onPress={onToggleFullscreen}
           >
-            <Icon name="fullscreen" />
+            <Icon name={fullscreen ? "fullscreen-exit" : "fullscreen"} />
           </Button>
         ) : null}
 
         {onClose != null ? (
+          // ✕ removes the whole node from the canvas (distinct from the fullscreen toggle).
           <Button
-            testID="article-window-close"
+            testID={`article-window-close-${nodeId}`}
             variant="ghost"
             size="icon"
             accessibilityLabel="Close window"
@@ -80,24 +96,14 @@ export default function ArticleWindow({
           lang={article.lang}
           nodeId={nodeId}
           title={article.canonicalTitle}
+          theme={theme}
+          initialScrollY={initialScrollY}
+          onScroll={onScroll}
           onMessage={onMessage}
         />
       </View>
-
-      {/* Attribution footer — fullscreen mode only */}
-      {fullscreen ? (
-        <View
-          testID="article-window-attribution"
-          className="flex-row border-t border-border px-3 py-2"
-        >
-          <Text className="text-xs text-muted-foreground">
-            {"Content from Wikipedia, licensed " + (article.license || "CC BY-SA 4.0") + " · "}
-          </Text>
-          <Pressable accessibilityRole="link" onPress={openSource}>
-            <Text className="text-xs text-primary">View original</Text>
-          </Pressable>
-        </View>
-      ) : null}
     </View>
   );
 }
+
+export default memo(ArticleWindowImpl);

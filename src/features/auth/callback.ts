@@ -15,6 +15,7 @@ interface ParsedAuthCallbackUrl {
   code: string | null;
   tokenHash: string | null;
   type: string | null;
+  error: string | null;
   errorCode: string | null;
   errorDescription: string | null;
 }
@@ -67,6 +68,7 @@ export function parseAuthCallbackUrl(url: string): ParsedAuthCallbackUrl {
     code: getParamFromAuthUrl(queryParams, hashParams, "code"),
     tokenHash: getParamFromAuthUrl(queryParams, hashParams, "token_hash"),
     type: getParamFromAuthUrl(queryParams, hashParams, "type"),
+    error: getParamFromAuthUrl(queryParams, hashParams, "error"),
     errorCode: getParamFromAuthUrl(queryParams, hashParams, "error_code"),
     errorDescription: getParamFromAuthUrl(queryParams, hashParams, "error_description"),
   };
@@ -76,8 +78,13 @@ export async function completeAuthRedirect(url: string): Promise<CompletedAuthRe
   const client = requireSupabase();
   const params = parseAuthCallbackUrl(url);
 
-  if (params.errorCode || params.errorDescription) {
-    throw new Error(params.errorDescription ?? "Unable to complete the authentication link.");
+  // OAuth/email errors arrive as `error` (e.g. access_denied) and/or `error_code`,
+  // usually with `error_description`. Surface any of them rather than falling through
+  // to the generic "missing parameters" message.
+  if (params.error || params.errorCode || params.errorDescription) {
+    throw new Error(
+      params.errorDescription ?? params.error ?? "Unable to complete the authentication link.",
+    );
   }
 
   if (params.code) {

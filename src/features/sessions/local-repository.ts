@@ -49,6 +49,12 @@ export async function getSessionBundle(sessionId: string): Promise<SessionBundle
   return getLocalStore().getBundle(sessionId);
 }
 
+// Initial viewport offset so the root node (world origin) lands clear of the floating
+// top bar — `screen = (world - viewport) * zoom`, so a negative viewport shifts content
+// down/right. ~80px down clears the ~56px-tall bar; a small left inset reads intentional.
+const INITIAL_VIEWPORT_X = -32;
+const INITIAL_VIEWPORT_Y = -80;
+
 export async function createSession(
   userId: string | null,
   title: string,
@@ -60,8 +66,8 @@ export async function createSession(
     id: newId(),
     userId,
     title,
-    viewportX: 0,
-    viewportY: 0,
+    viewportX: INITIAL_VIEWPORT_X,
+    viewportY: INITIAL_VIEWPORT_Y,
     viewportZoom: 1,
     createdAt: now,
     updatedAt: now,
@@ -156,6 +162,22 @@ export async function updateNodeGeometry(
   if (!node) throw new Error("Node not found");
   await store.upsertNode({ ...node, ...geom });
   await bumpSession(session);
+}
+
+/**
+ * Remove a single node (and any edges touching it), then bump the session clock.
+ * Sync is session-level LWW with wholesale bundle replacement (see merge.ts), so a
+ * newer local bundle minus this node replaces the remote's node set on the next push —
+ * no per-node tombstone is needed, and the deletion can't be resurrected by a pull.
+ */
+export async function deleteNode(sessionId: string, nodeId: string): Promise<void> {
+  const store = getLocalStore();
+  const session = await requireSession(sessionId);
+  const bundle = await store.getBundle(sessionId);
+  if (!bundle) throw new Error("Session not found");
+  const nodes = bundle.nodes.filter((n) => n.id !== nodeId);
+  const edges = bundle.edges.filter((e) => e.sourceNodeId !== nodeId && e.targetNodeId !== nodeId);
+  await store.replaceBundle({ session: { ...session, updatedAt: nowIso() }, nodes, edges });
 }
 
 // Re-export the shared clock/id helpers so sibling mutation ops (next task) bump from one source.

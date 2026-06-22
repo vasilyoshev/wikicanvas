@@ -84,15 +84,18 @@ export async function runSyncSignIn(): Promise<void> {
 /** Mount once high in the tree: starts/stops sync as auth state flips. */
 export function useSync(): void {
   const { user } = useSession();
+  const userId = user?.id ?? null;
   const cleanupRef = useRef<(() => void) | null>(null);
 
+  // Keyed on the user id (not the user object) so a token refresh that yields a new
+  // user object identity with the same id does not tear down + re-run the full merge.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
-    cleanupRef.current = startSyncForUser(user.id);
+    cleanupRef.current = startSyncForUser(userId);
     return () => {
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [user]);
+  }, [userId]);
 }

@@ -56,6 +56,24 @@ describe("mergeSessions", () => {
     expect(result.unchanged).toEqual([]);
   });
 
+  it("keeps a local tombstone on an equal-timestamp tie (no resurrection)", () => {
+    const ts = "2026-02-02T00:00:00.000Z";
+    const local = makeBundle({ id: "s1", updatedAt: ts, deletedAt: ts });
+    const remote = makeBundle({ id: "s1", updatedAt: ts, deletedAt: null });
+    const result = mergeSessions([local], [remote]);
+    expect(result.toUpload).toEqual([local]);
+    expect(result.toDownload).toEqual([]);
+  });
+
+  it("downloads a remote tombstone on an equal-timestamp tie", () => {
+    const ts = "2026-02-02T00:00:00.000Z";
+    const local = makeBundle({ id: "s1", updatedAt: ts, deletedAt: null });
+    const remote = makeBundle({ id: "s1", updatedAt: ts, deletedAt: ts });
+    const result = mergeSessions([local], [remote]);
+    expect(result.toDownload).toEqual([remote]);
+    expect(result.toUpload).toEqual([]);
+  });
+
   it("downloads a remote-only session", () => {
     const remote = makeBundle({ id: "s9" });
     const result = mergeSessions([], [remote]);

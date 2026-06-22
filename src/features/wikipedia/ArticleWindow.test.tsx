@@ -39,25 +39,49 @@ describe("ArticleWindow chrome", () => {
         onMessage={jest.fn()}
       />,
     );
-    fireEvent.press(screen.getByTestId("article-window-fullscreen"));
-    fireEvent.press(screen.getByTestId("article-window-close"));
+    fireEvent.press(screen.getByTestId("article-window-fullscreen-n1"));
+    fireEvent.press(screen.getByTestId("article-window-close-n1"));
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("does NOT render the license footer in card (non-fullscreen) mode", () => {
-    render(<ArticleWindow article={ARTICLE} nodeId="n1" onMessage={jest.fn()} />);
-    expect(screen.queryByTestId("article-window-attribution")).toBeNull();
+  it("never renders a per-window license footer (attribution lives in the viewport corner)", () => {
+    const { rerender } = render(
+      <ArticleWindow article={ARTICLE} nodeId="n1" onMessage={jest.fn()} />,
+    );
+    expect(screen.queryByTestId("article-window-attribution-n1")).toBeNull();
+
+    rerender(<ArticleWindow article={ARTICLE} nodeId="n1" fullscreen onMessage={jest.fn()} />);
+    expect(screen.queryByTestId("article-window-attribution-n1")).toBeNull();
   });
 
-  it("renders the CC BY-SA end-of-content footer in fullscreen mode", () => {
-    render(<ArticleWindow article={ARTICLE} nodeId="n1" fullscreen onMessage={jest.fn()} />);
-    expect(screen.getByTestId("article-window-attribution")).toBeTruthy();
-    expect(screen.getByText(/CC BY-SA/i)).toBeTruthy();
+  it("toggles fullscreen from the same control in both modes (the fullscreen close affordance)", () => {
+    const onToggle = jest.fn();
+    const { rerender } = render(
+      <ArticleWindow
+        article={ARTICLE}
+        nodeId="n1"
+        onToggleFullscreen={onToggle}
+        onMessage={jest.fn()}
+      />,
+    );
+    fireEvent.press(screen.getByTestId("article-window-fullscreen-n1"));
+
+    rerender(
+      <ArticleWindow
+        article={ARTICLE}
+        nodeId="n1"
+        fullscreen
+        onToggleFullscreen={onToggle}
+        onMessage={jest.fn()}
+      />,
+    );
+    fireEvent.press(screen.getByTestId("article-window-fullscreen-n1"));
+    expect(onToggle).toHaveBeenCalledTimes(2);
   });
 
   it("always renders the tappable Wikipedia source mark", () => {
     render(<ArticleWindow article={ARTICLE} nodeId="n1" onMessage={jest.fn()} />);
-    expect(screen.getByTestId("article-window-source")).toBeTruthy();
+    expect(screen.getByTestId("article-window-source-n1")).toBeTruthy();
   });
 });

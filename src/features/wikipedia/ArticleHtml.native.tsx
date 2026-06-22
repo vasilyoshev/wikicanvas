@@ -5,6 +5,7 @@ import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTyp
 import { buildSrcDoc } from "@/src/features/wikipedia/sandbox-html";
 import {
   parseInterceptorMessage,
+  parseScrollMessage,
   type InterceptorMessage,
 } from "@/src/features/wikipedia/messages";
 
@@ -13,6 +14,12 @@ export interface ArticleHtmlProps {
   lang: string;
   nodeId: string;
   title?: string;
+  /** Light/dark theme the article renders in (follows the app theme). */
+  theme?: "light" | "dark";
+  /** Scroll offset (px) restored when the frame first mounts. */
+  initialScrollY?: number;
+  /** Reports the frame's scroll position so the host can persist it. */
+  onScroll?: (scrollY: number) => void;
   onMessage: (message: InterceptorMessage, sourceNodeId: string) => void;
 }
 
@@ -32,26 +39,46 @@ export function shouldAcceptMessage(): boolean {
  * navigation request is blocked so live Wikipedia never loads inside the app frame.
  */
 export function shouldStartLoad(request: ShouldStartLoadRequest): boolean {
-  const { url, isTopFrame, mainDocumentURL } = request;
-  // Allow the initial srcdoc/blank load (top-frame, no main document URL yet).
-  if (isTopFrame && (url === "about:blank" || url === "about:srcdoc" || mainDocumentURL == null)) {
-    return true;
-  }
-  // Block everything else — real navigations go through postMessage instead.
-  return false;
+  // Allow ONLY the initial about: document (about:blank / about:srcdoc). Every other
+  // navigation — including real https:// URLs — is blocked; in-article links are
+  // delivered to the host via postMessage, never by navigating the WebView.
+  //
+  // Gate strictly on the URL scheme. We deliberately do NOT consult `mainDocumentURL`
+  // (iOS-only; always null on Android) or `isTopFrame` to permit a load: doing so let
+  // any top-frame URL through on Android, turning the reader into an open in-app
+  // browser pointed at attacker-controlled article script.
+  return request.url.startsWith("about:");
 }
 
-export default function ArticleHtml({ html, lang, nodeId, onMessage }: ArticleHtmlProps) {
-  const srcDoc = React.useMemo(() => buildSrcDoc(html, lang), [html, lang]);
+export default function ArticleHtml({
+  html,
+  lang,
+  nodeId,
+  theme = "light",
+  initialScrollY = 0,
+  onScroll,
+  onMessage,
+}: ArticleHtmlProps) {
+  const scrollRef = React.useRef(initialScrollY);
+  const srcDoc = React.useMemo(
+    () => buildSrcDoc(html, lang, { theme, initialScrollY: scrollRef.current }),
+    [html, lang, theme],
+  );
 
   const handleMessage = React.useCallback(
     (event: WebViewMessageEvent) => {
+      const scrollY = parseScrollMessage(event.nativeEvent.data);
+      if (scrollY != null) {
+        scrollRef.current = scrollY;
+        onScroll?.(scrollY);
+        return;
+      }
       const parsed = parseInterceptorMessage(event.nativeEvent.data);
       if (parsed) {
         onMessage(parsed, nodeId);
       }
     },
-    [nodeId, onMessage],
+    [nodeId, onMessage, onScroll],
   );
 
   return (

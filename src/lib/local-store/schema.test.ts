@@ -8,7 +8,6 @@ import {
   STORE_ARTICLE_CACHE,
   INDEX_BY_USER,
   INDEX_BY_SESSION,
-  INDEX_BY_TARGET,
   SQLITE_DDL,
 } from "@/src/lib/local-store/schema";
 
@@ -23,7 +22,6 @@ describe("local-store schema constants", () => {
   it("declares snake_case index names", () => {
     expect(INDEX_BY_USER).toBe("by_user");
     expect(INDEX_BY_SESSION).toBe("by_session");
-    expect(INDEX_BY_TARGET).toBe("by_target");
   });
 
   it("declares a versioned IndexedDB database", () => {

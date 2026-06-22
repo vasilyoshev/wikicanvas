@@ -5,13 +5,18 @@ import * as React from "react";
 import { Platform, Text as RNText, type Role, type TextStyle } from "react-native";
 import { TINT_TEXT, type TintToken } from "@/src/lib/design-tokens";
 
-const FONT_FAMILY = {
-  regular: "NotoSans_400Regular",
-  medium: "NotoSans_500Medium",
-  semibold: "NotoSans_600SemiBold",
-  bold: "NotoSans_700Bold",
-  extrabold: "NotoSans_800ExtraBold",
-} as const;
+// Match Wikipedia's content typography — the system sans-serif stack — rather than a
+// bundled webfont. This also mirrors the article iframe's body font (see
+// READABLE_STYLESHEET) so the app chrome and the article read as one typeface.
+//
+// On web we MUST name a family explicitly: react-native-web leaves Text without a
+// family, and the browser's default for unstyled text is serif (Times). On native we
+// return undefined so the platform's own sans-serif default is used. Weight is carried
+// by the `font-*` className in every case, so a single family is enough here.
+const APP_FONT_FAMILY = Platform.select({
+  web: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  default: undefined,
+});
 
 const textVariants = cva(
   cn(
@@ -74,40 +79,18 @@ const ARIA_LEVEL: Partial<Record<TextVariant, string>> = {
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
-function resolveFontFamily(classes: string, variant: TextVariant): string | undefined {
+function resolveFontFamily(classes: string): string | undefined {
+  // Monospace (e.g. the `code` variant) keeps the className-provided mono stack.
   if (classes.includes("font-mono")) {
     return undefined;
   }
 
-  if (classes.includes("font-extrabold")) {
-    return FONT_FAMILY.extrabold;
-  }
-
-  if (classes.includes("font-bold")) {
-    return FONT_FAMILY.bold;
-  }
-
-  if (classes.includes("font-semibold")) {
-    return FONT_FAMILY.semibold;
-  }
-
-  if (classes.includes("font-medium")) {
-    return FONT_FAMILY.medium;
-  }
-
-  if (variant === "h1") {
-    return FONT_FAMILY.extrabold;
-  }
-
-  return FONT_FAMILY.regular;
+  return APP_FONT_FAMILY;
 }
 
-export function getTextFontStyle(
-  classNames: (string | undefined)[],
-  variant: TextVariant = "default",
-): TextStyle | undefined {
+export function getTextFontStyle(classNames: (string | undefined)[]): TextStyle | undefined {
   const classes = classNames.filter(Boolean).join(" ");
-  const fontFamily = resolveFontFamily(classes, variant);
+  const fontFamily = resolveFontFamily(classes);
 
   if (!fontFamily) {
     return undefined;
@@ -148,7 +131,7 @@ function Text({
       className={cn(variantClassName, tintColor, textClass, className)}
       role={ROLE[resolvedVariant]}
       aria-level={ARIA_LEVEL[resolvedVariant]}
-      style={[getTextFontStyle([variantClassName, textClass, className], resolvedVariant), style]}
+      style={[getTextFontStyle([variantClassName, textClass, className]), style]}
       {...props}
     />
   );

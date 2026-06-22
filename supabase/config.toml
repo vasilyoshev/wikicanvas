@@ -1,1 +1,7 @@
 project_id = "wikicanvas"
+
+# wiki-proxy is a public, unauthenticated relay for Wikipedia content (no-login use).
+# Declared here so a clean `supabase functions deploy` does NOT default to JWT-required
+# (which would 401 every anonymous article/search fetch).
+[functions.wiki-proxy]
+verify_jwt = false

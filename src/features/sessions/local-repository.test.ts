@@ -91,6 +91,10 @@ describe("local-repository: read + create", () => {
     expect(bundle.session.title).toBe("Octopus");
     expect(bundle.session.userId).toBe("u-1");
     expect(bundle.session.viewportZoom).toBe(1);
+    // Framed so the root node (world origin) renders clear of the floating top bar,
+    // rather than at screen (0,0) underneath it.
+    expect(bundle.session.viewportX).toBeLessThan(0);
+    expect(bundle.session.viewportY).toBeLessThan(0);
     expect(bundle.session.deletedAt).toBeNull();
     expect(bundle.nodes).toHaveLength(1);
     expect(bundle.nodes[0]).toMatchObject({

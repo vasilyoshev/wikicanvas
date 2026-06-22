@@ -3,9 +3,15 @@
  * It captures a[href] clicks, preventDefault, classifies inline (mirroring links.ts),
  * and posts an InterceptorMessage: web -> parent.postMessage(msg, "*"); native ->
  * window.ReactNativeWebView.postMessage(JSON.stringify(msg)). Exposes __wcClassify for tests.
+ *
+ * Also restores `initialScrollY` on load and reports scroll changes back to the host
+ * (throttled) so each node's reading position survives re-render / reopen.
  */
-export function buildInterceptorScript(lang: string): string {
+export function buildInterceptorScript(lang: string, initialScrollY: number = 0): string {
   const langLiteral = JSON.stringify(lang);
+  const initialScroll = Number.isFinite(initialScrollY)
+    ? Math.max(0, Math.round(initialScrollY))
+    : 0;
   return `
 (function () {
   var PAGE_LANG = ${langLiteral};
@@ -83,6 +89,29 @@ export function buildInterceptorScript(lang: string): string {
       }
       post(msg);
     }, true);
+  }
+  // Per-node scroll: restore the saved position on load, and report changes back to the
+  // host (throttled, with a trailing call) so the reading position is persisted.
+  var INITIAL_SCROLL = ${initialScroll};
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    function restoreScroll() { try { window.scrollTo(0, INITIAL_SCROLL); } catch (e) {} }
+    if (INITIAL_SCROLL > 0) {
+      if (document.readyState === "complete") restoreScroll();
+      else window.addEventListener("DOMContentLoaded", restoreScroll);
+      window.addEventListener("load", restoreScroll);
+    }
+    var lastScrollPost = 0, scrollTimer = null;
+    function postScroll() {
+      lastScrollPost = Date.now();
+      var y = window.scrollY || document.documentElement.scrollTop ||
+        (document.body && document.body.scrollTop) || 0;
+      post({ type: "scroll", scrollY: Math.round(y) });
+    }
+    window.addEventListener("scroll", function () {
+      var now = Date.now();
+      if (now - lastScrollPost >= 200) postScroll();
+      else { if (scrollTimer) clearTimeout(scrollTimer); scrollTimer = setTimeout(postScroll, 200); }
+    }, { passive: true });
   }
 })();
 __wcClassify;

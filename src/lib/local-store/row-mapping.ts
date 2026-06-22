@@ -47,6 +47,17 @@ export interface CacheRow {
   etag: string | null;
 }
 
+/**
+ * Normalize a stored timestamp to ISO, but degrade gracefully: a malformed value
+ * (`new Date(x).toISOString()` throws RangeError on invalid input) would otherwise
+ * poison the whole read path (listSessions maps every row). Pass the raw value
+ * through instead so one bad row can't make the entire session list unreadable.
+ */
+function toIsoSafe(value: string): string {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toISOString();
+}
+
 export function sessionRowToDomain(row: SessionRow): Session {
   return {
     id: row.id,
@@ -55,9 +66,9 @@ export function sessionRowToDomain(row: SessionRow): Session {
     viewportX: row.viewport_x,
     viewportY: row.viewport_y,
     viewportZoom: row.viewport_zoom,
-    createdAt: new Date(row.created_at).toISOString(),
-    updatedAt: new Date(row.updated_at).toISOString(),
-    deletedAt: row.deleted_at ? new Date(row.deleted_at).toISOString() : null,
+    createdAt: toIsoSafe(row.created_at),
+    updatedAt: toIsoSafe(row.updated_at),
+    deletedAt: row.deleted_at ? toIsoSafe(row.deleted_at) : null,
   };
 }
 

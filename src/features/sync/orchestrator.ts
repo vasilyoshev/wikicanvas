@@ -1,7 +1,12 @@
 import { getLocalStore } from "@/src/lib/local-store";
 import { mergeSessions } from "@/src/features/sync/merge";
 import { applyMergeResult } from "@/src/features/sync/apply";
-import { adoptAnonSessions, fetchRemoteBundles, pushBundle } from "@/src/features/sync/remote";
+import {
+  adoptAnonSessions,
+  fetchRemoteBundle,
+  fetchRemoteBundles,
+  pushBundle,
+} from "@/src/features/sync/remote";
 import type { MergeResult, SyncBundle } from "@/src/features/sync/types";
 
 /** Read every local bundle (incl. tombstones) for a user, skipping any that vanished mid-read. */
@@ -30,8 +35,9 @@ export async function syncOnSignIn(userId: string): Promise<MergeResult> {
 
 /** On opening a session while signed in: pull that session, merge, apply. */
 export async function syncSessionOnOpen(userId: string, sessionId: string): Promise<void> {
-  const remoteAll = await fetchRemoteBundles(userId);
-  const remote = remoteAll.filter((bundle) => bundle.session.id === sessionId);
+  // Fetch only THIS session (not the user's entire remote dataset) on open.
+  const remoteBundle = await fetchRemoteBundle(userId, sessionId);
+  const remote = remoteBundle ? [remoteBundle] : [];
 
   const localBundle = await getLocalStore().getBundle(sessionId);
   const local = localBundle ? [localBundle] : [];
@@ -50,6 +56,9 @@ interface PendingPush {
 
 const pendingPushes = new Map<string, PendingPush>();
 
+/** Pushes whose debounce already fired and are mid round-trip (tracked so flush can await them). */
+const inFlightPushes = new Set<Promise<void>>();
+
 /** Load a session's bundle and push it; never throws (logs and returns). */
 async function runPush(sessionId: string): Promise<void> {
   try {
@@ -61,6 +70,14 @@ async function runPush(sessionId: string): Promise<void> {
   }
 }
 
+/** Run a push while tracking it as in-flight until it settles. */
+function runPushTracked(sessionId: string): Promise<void> {
+  const promise = runPush(sessionId); // runPush never throws (it logs and resolves)
+  inFlightPushes.add(promise);
+  void promise.finally(() => inFlightPushes.delete(promise));
+  return promise;
+}
+
 /** Debounced background push of a changed session (no-op when signed out). */
 export function scheduleBackgroundPush(userId: string | null, sessionId: string): void {
   if (!userId) return;
@@ -70,7 +87,7 @@ export function scheduleBackgroundPush(userId: string | null, sessionId: string)
 
   const timer = setTimeout(() => {
     pendingPushes.delete(sessionId);
-    void runPush(sessionId);
+    void runPushTracked(sessionId);
   }, BACKGROUND_PUSH_DEBOUNCE_MS);
 
   pendingPushes.set(sessionId, { timer, userId });
@@ -80,10 +97,13 @@ export function scheduleBackgroundPush(userId: string | null, sessionId: string)
 export async function flushPendingPushes(): Promise<void> {
   const entries = Array.from(pendingPushes.entries());
   pendingPushes.clear();
-  await Promise.all(
-    entries.map(([sessionId, pending]) => {
-      clearTimeout(pending.timer);
-      return runPush(sessionId);
-    }),
-  );
+  // Fire pending (debounced-but-not-yet-run) pushes now...
+  for (const [sessionId, pending] of entries) {
+    clearTimeout(pending.timer);
+    void runPushTracked(sessionId);
+  }
+  // ...then await ALL in-flight pushes — including ones whose debounce timer already
+  // fired before this flush — so a sign-out / backgrounding genuinely drains rather
+  // than reporting clean while a push is still mid round-trip.
+  await Promise.all([...inFlightPushes]);
 }
