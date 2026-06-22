@@ -21,6 +21,8 @@ import {
   useUpdateNodeGeometry,
   useUpdateViewport,
 } from "@/src/features/sessions/queries";
+import { syncSessionOnOpen } from "@/src/features/sync/orchestrator";
+import { useSession } from "@/src/providers/session-provider";
 import { getArticle } from "@/src/features/wikipedia/client";
 import type { ArticleResult } from "@/src/features/wikipedia/types";
 import type { InterceptorMessage } from "@/src/features/wikipedia/messages";
@@ -114,6 +116,17 @@ export function CanvasScreen({ sessionId }: CanvasScreenProps) {
   const { handleMessage } = useLinkSpawn({ sessionId, nodes, onPanToReveal });
 
   const addNode = useAddNode();
+
+  const { user } = useSession();
+
+  // Pull + merge this session from remote when it opens while signed in. Fire-and-forget:
+  // a sync failure must never block opening the canvas. (spec §9/§11)
+  useEffect(() => {
+    if (!user) return;
+    void syncSessionOnOpen(user.id, sessionId).catch((error) => {
+      console.warn("[sync] syncSessionOnOpen failed", error);
+    });
+  }, [user, sessionId]);
 
   // Add-article picker (root window): de-dupe against existing nodes ourselves
   // (select+pan if present; otherwise create a root node — NO edge).
