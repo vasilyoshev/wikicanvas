@@ -1,6 +1,12 @@
 // src/features/sync/orchestrator.test.ts
-import { syncOnSignIn, syncSessionOnOpen } from "@/src/features/sync/orchestrator";
-import { adoptAnonSessions, fetchRemoteBundles } from "@/src/features/sync/remote";
+import {
+  syncOnSignIn,
+  syncSessionOnOpen,
+  scheduleBackgroundPush,
+  flushPendingPushes,
+  BACKGROUND_PUSH_DEBOUNCE_MS,
+} from "@/src/features/sync/orchestrator";
+import { adoptAnonSessions, fetchRemoteBundles, pushBundle } from "@/src/features/sync/remote";
 import { mergeSessions } from "@/src/features/sync/merge";
 import { applyMergeResult } from "@/src/features/sync/apply";
 import { getLocalStore } from "@/src/lib/local-store";
@@ -9,6 +15,7 @@ import type { SyncBundle, MergeResult } from "@/src/features/sync/types";
 jest.mock("@/src/features/sync/remote", () => ({
   adoptAnonSessions: jest.fn(),
   fetchRemoteBundles: jest.fn(),
+  pushBundle: jest.fn(),
 }));
 jest.mock("@/src/features/sync/merge", () => ({ mergeSessions: jest.fn() }));
 jest.mock("@/src/features/sync/apply", () => ({ applyMergeResult: jest.fn() }));
@@ -19,6 +26,7 @@ const mockFetch = jest.mocked(fetchRemoteBundles);
 const mockMerge = jest.mocked(mergeSessions);
 const mockApply = jest.mocked(applyMergeResult);
 const mockGetLocalStore = jest.mocked(getLocalStore);
+const mockPushBundle = jest.mocked(pushBundle);
 
 function bundle(id: string): SyncBundle {
   return {
@@ -139,5 +147,84 @@ describe("syncSessionOnOpen", () => {
     await syncSessionOnOpen("u1", "missing");
     expect(mockMerge).toHaveBeenCalledWith([], []);
     expect(mockApply).toHaveBeenCalledWith({ toUpload: [], toDownload: [], unchanged: [] });
+  });
+});
+
+describe("scheduleBackgroundPush / flushPendingPushes", () => {
+  let getBundle: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    getBundle = jest.fn().mockResolvedValue(bundle("s1"));
+    mockGetLocalStore.mockReturnValue({
+      getBundle,
+    } as unknown as ReturnType<typeof getLocalStore>);
+    mockPushBundle.mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    await flushPendingPushes();
+    jest.useRealTimers();
+  });
+
+  it("is a no-op when signed out (userId null)", () => {
+    scheduleBackgroundPush(null, "s1");
+    jest.advanceTimersByTime(BACKGROUND_PUSH_DEBOUNCE_MS + 100);
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(mockPushBundle).not.toHaveBeenCalled();
+  });
+
+  it("pushes the bundle after the debounce window elapses", async () => {
+    scheduleBackgroundPush("u1", "s1");
+    expect(mockPushBundle).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(BACKGROUND_PUSH_DEBOUNCE_MS);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(getBundle).toHaveBeenCalledWith("s1");
+    expect(mockPushBundle).toHaveBeenCalledWith(bundle("s1"));
+  });
+
+  it("debounces rapid calls for the same session into a single push", async () => {
+    scheduleBackgroundPush("u1", "s1");
+    jest.advanceTimersByTime(BACKGROUND_PUSH_DEBOUNCE_MS - 200);
+    scheduleBackgroundPush("u1", "s1");
+    jest.advanceTimersByTime(BACKGROUND_PUSH_DEBOUNCE_MS - 200);
+    expect(mockPushBundle).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(300);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockPushBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps separate debounce timers per session", async () => {
+    getBundle.mockImplementation(async (id: string) => bundle(id));
+    scheduleBackgroundPush("u1", "s1");
+    scheduleBackgroundPush("u1", "s2");
+    jest.advanceTimersByTime(BACKGROUND_PUSH_DEBOUNCE_MS);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockPushBundle).toHaveBeenCalledTimes(2);
+    expect(mockPushBundle).toHaveBeenCalledWith(bundle("s1"));
+    expect(mockPushBundle).toHaveBeenCalledWith(bundle("s2"));
+  });
+
+  it("flushPendingPushes runs a queued push immediately without waiting", async () => {
+    scheduleBackgroundPush("u1", "s1");
+    await flushPendingPushes();
+    expect(mockPushBundle).toHaveBeenCalledWith(bundle("s1"));
+    // timer was cleared: advancing does not double-push
+    jest.advanceTimersByTime(BACKGROUND_PUSH_DEBOUNCE_MS);
+    await Promise.resolve();
+    expect(mockPushBundle).toHaveBeenCalledTimes(1);
+  });
+
+  it("swallows push errors so a failed push never rejects to the caller", async () => {
+    mockPushBundle.mockRejectedValue(new Error("network down"));
+    scheduleBackgroundPush("u1", "s1");
+    await expect(flushPendingPushes()).resolves.toBeUndefined();
   });
 });
