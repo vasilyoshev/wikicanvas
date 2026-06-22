@@ -2,6 +2,9 @@ import {
   sessionRowToDomain,
   nodeRowToDomain,
   edgeRowToDomain,
+  sessionToRow,
+  nodeToRow,
+  edgeToRow,
   type SessionRow,
   type NodeRow,
   type EdgeRow,
@@ -46,4 +49,29 @@ export async function fetchRemoteBundles(userId: string): Promise<SyncBundle[]> 
     nodes: (nodesBySession.get(row.id) ?? []).map(nodeRowToDomain),
     edges: (edgesBySession.get(row.id) ?? []).map(edgeRowToDomain),
   }));
+}
+
+/** Upsert one bundle: session + replace its nodes/edges remotely. */
+export async function pushBundle(bundle: SyncBundle): Promise<void> {
+  const client = requireSupabase();
+  const sessionId = bundle.session.id;
+
+  const sessionRes = await client.from("session").upsert(sessionToRow(bundle.session));
+  if (sessionRes.error) throw sessionRes.error;
+
+  // Replace-wholesale: clear existing children, then re-insert. Edges deleted before
+  // nodes (edge FK -> node); re-inserted nodes-first so edge FK targets exist.
+  const edgeDel = await client.from("edge").delete().eq("session_id", sessionId);
+  if (edgeDel.error) throw edgeDel.error;
+  const nodeDel = await client.from("node").delete().eq("session_id", sessionId);
+  if (nodeDel.error) throw nodeDel.error;
+
+  if (bundle.nodes.length > 0) {
+    const nodeRes = await client.from("node").upsert(bundle.nodes.map(nodeToRow));
+    if (nodeRes.error) throw nodeRes.error;
+  }
+  if (bundle.edges.length > 0) {
+    const edgeRes = await client.from("edge").upsert(bundle.edges.map(edgeToRow));
+    if (edgeRes.error) throw edgeRes.error;
+  }
 }

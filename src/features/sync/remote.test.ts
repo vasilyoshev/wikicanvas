@@ -2,6 +2,10 @@
 import { fetchRemoteBundles } from "@/src/features/sync/remote";
 import { requireSupabase } from "@/src/lib/supabase";
 
+// --- append to src/features/sync/remote.test.ts ---
+import { pushBundle } from "@/src/features/sync/remote";
+import type { SyncBundle } from "@/src/features/sync/types";
+
 jest.mock("@/src/lib/supabase", () => ({
   requireSupabase: jest.fn(),
 }));
@@ -103,5 +107,98 @@ describe("fetchRemoteBundles", () => {
       fakeClient({ session: { data: [], error: { message: "boom" } } }),
     );
     await expect(fetchRemoteBundles("u1")).rejects.toEqual({ message: "boom" });
+  });
+});
+
+function makeBundle(): SyncBundle {
+  return {
+    session: {
+      id: "s1",
+      userId: "u1",
+      title: "Roman Empire",
+      viewportX: 0,
+      viewportY: 0,
+      viewportZoom: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+      deletedAt: null,
+    },
+    nodes: [
+      {
+        id: "n1",
+        sessionId: "s1",
+        articleTitle: "Roman Empire",
+        lang: "en",
+        x: 0,
+        y: 0,
+        width: 380,
+        height: 520,
+        parentNodeId: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ],
+    edges: [
+      {
+        id: "e1",
+        sessionId: "s1",
+        sourceNodeId: "n1",
+        targetNodeId: "n2",
+        clickedLinkText: "Augustus",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    ],
+  };
+}
+
+describe("pushBundle", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("upserts the session row, deletes then upserts child rows, omitting user_id on children", async () => {
+    const sessionUpsert = jest.fn().mockResolvedValue({ error: null });
+    const nodeUpsert = jest.fn().mockResolvedValue({ error: null });
+    const edgeUpsert = jest.fn().mockResolvedValue({ error: null });
+    const nodeDeleteEq = jest.fn().mockResolvedValue({ error: null });
+    const edgeDeleteEq = jest.fn().mockResolvedValue({ error: null });
+    const nodeDelete = jest.fn(() => ({ eq: nodeDeleteEq }));
+    const edgeDelete = jest.fn(() => ({ eq: edgeDeleteEq }));
+
+    const from = jest.fn((table: string) => {
+      if (table === "session") return { upsert: sessionUpsert };
+      if (table === "node") return { upsert: nodeUpsert, delete: nodeDelete };
+      if (table === "edge") return { upsert: edgeUpsert, delete: edgeDelete };
+      throw new Error(`unexpected table ${table}`);
+    });
+    mockRequireSupabase.mockReturnValue({ from } as unknown as ReturnType<typeof requireSupabase>);
+
+    await pushBundle(makeBundle());
+
+    // session upserted as a row (snake_case)
+    expect(sessionUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "s1", user_id: "u1", viewport_zoom: 1 }),
+    );
+    // children deleted by session_id then re-inserted
+    expect(nodeDelete).toHaveBeenCalled();
+    expect(nodeDeleteEq).toHaveBeenCalledWith("session_id", "s1");
+    expect(edgeDeleteEq).toHaveBeenCalledWith("session_id", "s1");
+
+    const nodePayload = nodeUpsert.mock.calls[0][0][0];
+    expect(nodePayload).toMatchObject({
+      id: "n1",
+      session_id: "s1",
+      article_title: "Roman Empire",
+    });
+    expect(nodePayload).not.toHaveProperty("user_id");
+
+    const edgePayload = edgeUpsert.mock.calls[0][0][0];
+    expect(edgePayload).toMatchObject({ id: "e1", session_id: "s1", source_node_id: "n1" });
+    expect(edgePayload).not.toHaveProperty("user_id");
+  });
+
+  it("throws when the session upsert errors", async () => {
+    const from = jest.fn(() => ({
+      upsert: jest.fn().mockResolvedValue({ error: { message: "no" } }),
+    }));
+    mockRequireSupabase.mockReturnValue({ from } as unknown as ReturnType<typeof requireSupabase>);
+    await expect(pushBundle(makeBundle())).rejects.toEqual({ message: "no" });
   });
 });
