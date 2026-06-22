@@ -66,6 +66,90 @@ describe("startSyncForUser", () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
     expect(mockFlush).toHaveBeenCalledTimes(1);
   });
+
+  it("flushes pending pushes when the tab is hidden via visibilitychange", () => {
+    mockSubscribe.mockReturnValue(() => {});
+
+    // The react-native test environment doesn't provide `document`. Provide a
+    // minimal stub so the web-path in startSyncForUser runs.
+    const listeners: Record<string, EventListenerOrEventListenerObject[]> = {};
+    const mockDoc = {
+      visibilityState: "hidden" as DocumentVisibilityState,
+      addEventListener: jest.fn((event: string, cb: EventListenerOrEventListenerObject) => {
+        (listeners[event] ??= []).push(cb);
+      }),
+      removeEventListener: jest.fn((event: string, cb: EventListenerOrEventListenerObject) => {
+        listeners[event] = (listeners[event] ?? []).filter((l) => l !== cb);
+      }),
+    };
+    const origDoc = global.document;
+    Object.defineProperty(global, "document", { value: mockDoc, configurable: true });
+
+    const cleanup = startSyncForUser("u1");
+
+    // Trigger visibilitychange listeners — should flush because state is "hidden".
+    (listeners["visibilitychange"] ?? []).forEach((l) =>
+      (l as EventListener)(new Event("visibilitychange")),
+    );
+    expect(mockFlush).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    Object.defineProperty(global, "document", { value: origDoc, configurable: true });
+  });
+
+  it("flushes pending pushes on pagehide", () => {
+    mockSubscribe.mockReturnValue(() => {});
+
+    const listeners: Record<string, EventListenerOrEventListenerObject[]> = {};
+    const mockDoc = {
+      visibilityState: "visible" as DocumentVisibilityState,
+      addEventListener: jest.fn((event: string, cb: EventListenerOrEventListenerObject) => {
+        (listeners[event] ??= []).push(cb);
+      }),
+      removeEventListener: jest.fn((event: string, cb: EventListenerOrEventListenerObject) => {
+        listeners[event] = (listeners[event] ?? []).filter((l) => l !== cb);
+      }),
+    };
+    const origDoc = global.document;
+    Object.defineProperty(global, "document", { value: mockDoc, configurable: true });
+
+    const cleanup = startSyncForUser("u1");
+
+    (listeners["pagehide"] ?? []).forEach((l) => (l as EventListener)(new Event("pagehide")));
+    expect(mockFlush).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    Object.defineProperty(global, "document", { value: origDoc, configurable: true });
+  });
+
+  it("removes web listeners on cleanup so they don't fire after sign-out", () => {
+    mockSubscribe.mockReturnValue(() => {});
+
+    const listeners: Record<string, EventListenerOrEventListenerObject[]> = {};
+    const mockDoc = {
+      visibilityState: "visible" as DocumentVisibilityState,
+      addEventListener: jest.fn((event: string, cb: EventListenerOrEventListenerObject) => {
+        (listeners[event] ??= []).push(cb);
+      }),
+      removeEventListener: jest.fn((event: string, cb: EventListenerOrEventListenerObject) => {
+        listeners[event] = (listeners[event] ?? []).filter((l) => l !== cb);
+      }),
+    };
+    const origDoc = global.document;
+    Object.defineProperty(global, "document", { value: mockDoc, configurable: true });
+
+    const cleanup = startSyncForUser("u1");
+    cleanup(); // removes listeners + flushes once
+
+    jest.clearAllMocks();
+    mockFlush.mockResolvedValue(undefined);
+
+    // After cleanup, listeners array is empty — no flush from pagehide.
+    (listeners["pagehide"] ?? []).forEach((l) => (l as EventListener)(new Event("pagehide")));
+    expect(mockFlush).not.toHaveBeenCalled();
+
+    Object.defineProperty(global, "document", { value: origDoc, configurable: true });
+  });
 });
 
 describe("runSyncSignIn", () => {

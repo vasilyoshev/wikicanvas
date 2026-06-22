@@ -20,8 +20,10 @@ import {
   useSessionBundle,
   useUpdateNodeGeometry,
   useUpdateViewport,
+  sessionKeys,
 } from "@/src/features/sessions/queries";
 import { syncSessionOnOpen } from "@/src/features/sync/orchestrator";
+import { queryClient } from "@/src/lib/query-client";
 import { useSession } from "@/src/providers/session-provider";
 import { getArticle } from "@/src/features/wikipedia/client";
 import type { ArticleResult } from "@/src/features/wikipedia/types";
@@ -123,9 +125,13 @@ export function CanvasScreen({ sessionId }: CanvasScreenProps) {
   // a sync failure must never block opening the canvas. (spec §9/§11)
   useEffect(() => {
     if (!user) return;
-    void syncSessionOnOpen(user.id, sessionId).catch((error) => {
-      console.warn("[sync] syncSessionOnOpen failed", error);
-    });
+    void syncSessionOnOpen(user.id, sessionId)
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: sessionKeys.bundle(sessionId) });
+      })
+      .catch((error) => {
+        console.warn("[sync] syncSessionOnOpen failed", error);
+      });
   }, [user, sessionId]);
 
   // Add-article picker (root window): de-dupe against existing nodes ourselves

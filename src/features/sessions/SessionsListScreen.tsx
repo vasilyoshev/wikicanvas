@@ -22,6 +22,7 @@ import {
 } from "@/src/features/sessions/queries";
 import { NewSessionSearch } from "@/src/features/sessions/NewSessionSearch";
 import { SessionCard } from "@/src/features/sessions/SessionCard";
+import { signOut } from "@/src/features/auth/api";
 import { runSyncSignIn } from "@/src/features/sync/use-sync";
 import { useSession } from "@/src/providers/session-provider";
 
@@ -41,6 +42,12 @@ export function SessionsListScreen() {
   const handleSignInToSync = () => {
     void runSyncSignIn().catch((error) => {
       console.warn("[sync] sign-in failed", error);
+    });
+  };
+
+  const handleSignOut = () => {
+    void signOut().catch((error) => {
+      console.warn("[sync] sign-out failed", error);
     });
   };
 
@@ -86,7 +93,11 @@ export function SessionsListScreen() {
       <ScrollView contentContainerClassName="grow gap-6 p-4">
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-2xl font-bold">Your sessions</Text>
-          {user ? null : (
+          {user ? (
+            <Button testID="sign-out" variant="secondary" onPress={handleSignOut}>
+              <Text>Sign out</Text>
+            </Button>
+          ) : (
             <Button testID="sign-in-sync" variant="secondary" onPress={handleSignInToSync}>
               <Text>Sign in to sync</Text>
             </Button>

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AppState } from "react-native";
 
 import { signInWithGoogle } from "@/src/features/auth/api";
 import {
@@ -15,6 +16,9 @@ import { useSession } from "@/src/providers/session-provider";
  * Begin sync for a signed-in user: subscribe the sync-bus (every change notification
  * schedules a debounced push) and run the full sign-in merge once. Returns a cleanup
  * that unsubscribes and flushes any pending pushes. Sync failures are logged, not thrown.
+ *
+ * Also registers early-flush triggers so edits within the debounce window aren't lost
+ * when the browser tab is hidden / the native app is backgrounded.
  */
 export function startSyncForUser(userId: string): () => void {
   const unsubscribe = syncBus.subscribe((sessionId) => {
@@ -30,7 +34,39 @@ export function startSyncForUser(userId: string): () => void {
       console.warn("[sync] syncOnSignIn failed", error);
     });
 
+  // --- Early-flush listeners (one set per signed-in session) ---
+  let removeEarlyFlushListeners: () => void;
+
+  if (typeof document !== "undefined") {
+    // Web: flush when the tab becomes hidden (visibilitychange) or is unloaded (pagehide).
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void flushPendingPushes();
+      }
+    };
+    const handlePageHide = () => {
+      void flushPendingPushes();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("pagehide", handlePageHide);
+    removeEarlyFlushListeners = () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("pagehide", handlePageHide);
+    };
+  } else {
+    // Native: flush when the app is backgrounded or goes inactive.
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        void flushPendingPushes();
+      }
+    });
+    removeEarlyFlushListeners = () => {
+      appStateSubscription.remove();
+    };
+  }
+
   return () => {
+    removeEarlyFlushListeners();
     unsubscribe();
     void flushPendingPushes();
   };
