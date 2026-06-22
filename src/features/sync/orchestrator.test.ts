@@ -223,8 +223,11 @@ describe("scheduleBackgroundPush / flushPendingPushes", () => {
   });
 
   it("swallows push errors so a failed push never rejects to the caller", async () => {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     mockPushBundle.mockRejectedValue(new Error("network down"));
     scheduleBackgroundPush("u1", "s1");
     await expect(flushPendingPushes()).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
