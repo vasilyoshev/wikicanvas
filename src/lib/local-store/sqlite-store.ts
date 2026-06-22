@@ -39,7 +39,9 @@ export class SqliteLocalStore implements LocalStore {
 
   async listSessions(userId: string | null, includeDeleted = false): Promise<Session[]> {
     const db = await this.db();
-    const where = userId === null ? "user_id is null" : "user_id = ?";
+    // null userId → all local sessions (local-first display: show everything in the store).
+    // Non-null userId → only sessions owned by that user.
+    const where = userId === null ? "1=1" : "user_id = ?";
     const liveClause = includeDeleted ? "" : " and deleted_at is null";
     const params = userId === null ? [] : [userId];
     const rows = await db.getAllAsync<SessionRow>(

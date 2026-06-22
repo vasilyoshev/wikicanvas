@@ -61,10 +61,13 @@ export class IndexedDBLocalStore implements LocalStore {
     const db = await this.db();
     let rows: SessionRow[];
     if (userId === null) {
+      // null userId means "all local sessions" — covers the local-first display path where
+      // the UI lists everything in the local store regardless of ownership.  This includes
+      // both truly-anonymous sessions (user_id=null) and sessions adopted/downloaded after
+      // sign-in but before a full page reload (user_id=<userId>).
       // IDBKeyRange.only(null) throws DataError and the by_user index omits null keys,
-      // so read all and filter user_id === null in JS.
-      const all = await db.getAll(STORE_SESSIONS);
-      rows = all.filter((r) => r.user_id === null);
+      // so we read all rows and apply the includeDeleted filter below.
+      rows = await db.getAll(STORE_SESSIONS);
     } else {
       rows = await db.getAllFromIndex(STORE_SESSIONS, INDEX_BY_USER, userId);
     }
