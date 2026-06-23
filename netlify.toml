@@ -4,6 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "20.19.0"
+  EXPO_PUBLIC_SUPABASE_URL = "https://lhxixheyjoxujewybhgw.supabase.co"
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_A9IkL0vZ6_7IMXaOzOiahw_gr_UWfsr"
+  EXPO_PUBLIC_PUBLIC_APP_URL = "https://wikicanvas.netlify.app"
 
 [[redirects]]
   from = "/*"
