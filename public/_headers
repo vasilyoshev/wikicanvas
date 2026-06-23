@@ -1,2 +1,10 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://lhxixheyjoxujewybhgw.supabase.co wss://lhxixheyjoxujewybhgw.supabase.co; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' blob: data:; manifest-src 'self'; frame-ancestors 'none'; form-action 'self'
+
 /canvaskit.wasm
   Content-Type: application/wasm
