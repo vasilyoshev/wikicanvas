@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="all" />
+    <title>WikiCanvas — Privacy Policy</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 4rem;
+        font:
+          16px/1.6 system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          sans-serif;
+      }
+      h1 {
+        font-size: 1.75rem;
+      }
+      h2 {
+        margin-top: 2rem;
+        font-size: 1.2rem;
+      }
+      a {
+        color: #7c3aed;
+      }
+      .muted {
+        opacity: 0.7;
+        font-size: 0.9rem;
+      }
+      code {
+        font-family: ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WikiCanvas Privacy Policy</h1>
+    <p class="muted">Last updated: 23 June 2026</p>
+
+    <p>
+      WikiCanvas is an infinite canvas for exploring Wikipedia articles. It is
+      <strong>local-first</strong>: it works fully without an account, and your canvases are stored
+      on your own device. This policy explains the limited data involved when you choose to sign in
+      or read articles.
+    </p>
+
+    <h2>Data stored on your device</h2>
+    <p>
+      Your sessions (article maps, window positions, and viewport) are stored locally in your
+      browser (IndexedDB) or on your device (SQLite). This data never leaves your device unless you
+      sign in to sync.
+    </p>
+
+    <h2>Data we store when you sign in (optional)</h2>
+    <p>
+      Signing in with Google is optional and only enables cross-device sync. When you sign in we
+      store, in our Supabase database, your account identifier and email address (from Google) and
+      the contents of your synced sessions. Access is restricted by row-level security so that only
+      your account can read or write your data.
+    </p>
+
+    <h2>Wikipedia content</h2>
+    <p>
+      Article and search requests are relayed to Wikipedia through our proxy so the app can run
+      without per-user Wikipedia accounts. Your IP address reaches our proxy and Wikipedia as part
+      of a normal web request. We do not log or build a profile of your reading.
+    </p>
+
+    <h2>What we do not do</h2>
+    <p>No advertising. No third-party analytics or tracking. No sale of personal data.</p>
+
+    <h2>Third parties</h2>
+    <ul>
+      <li>Google — sign-in (authentication).</li>
+      <li>Supabase — database, authentication, and the Wikipedia proxy.</li>
+      <li>Wikipedia / Wikimedia — article content.</li>
+      <li>Netlify — web hosting.</li>
+    </ul>
+
+    <h2>Retention &amp; deletion</h2>
+    <p>
+      Signing out clears the local session on that device. To delete your synced account data, email
+      us at the address below and we will remove it.
+    </p>
+
+    <h2>Children</h2>
+    <p>WikiCanvas is not directed at children under 13.</p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions or deletion requests:
+      <a href="mailto:vasil.yoshev@gmail.com">vasil.yoshev@gmail.com</a>.
+    </p>
+
+    <h2>Source code</h2>
+    <p>
+      WikiCanvas is open source (AGPL-3.0):
+      <a href="https://github.com/vasilyoshev/wikicanvas">github.com/vasilyoshev/wikicanvas</a>.
+    </p>
+  </body>
+</html>
