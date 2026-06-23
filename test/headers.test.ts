@@ -17,7 +17,7 @@ describe("public/_headers", () => {
 
   it("keeps the script-src tokens the app actually needs", () => {
     // Metro's web async-chunk loader runs eval(); the srcdoc article iframe
-    // inherits this CSP and injects inline scripts. Both tokens are required.
+    // inherits this CSP and injects inline scripts. All three tokens are required.
     expect(headers).toMatch(/'unsafe-eval'/);
     expect(headers).toMatch(/'unsafe-inline'/);
     expect(headers).toMatch(/'wasm-unsafe-eval'/);
