@@ -55,6 +55,18 @@ Netlify runs `npm run export:web` and publishes `dist/`. `export:web` runs
 `setup:skia-web` first so `public/canvaskit.wasm` is bundled — the web Skia
 canvas needs it.
 
+## Production / Go-Live
+
+Taking WikiCanvas to production (Supabase + Google SSO + Netlify web + Android
+on the Play internal-testing track) is documented as an ordered runbook in
+[`docs/GO-LIVE.md`](docs/GO-LIVE.md). The design rationale and verified
+external-console steps are in
+[`docs/superpowers/specs/2026-06-23-production-go-live-design.md`](docs/superpowers/specs/2026-06-23-production-go-live-design.md).
+
+The production web app is built by Netlify (`npm run export:web` → `dist/`) with
+security headers + a Content-Security-Policy in `public/_headers`. Android builds
+ship via EAS (`eas build` / `eas submit`).
+
 ## License & source
 
 WikiCanvas is licensed under the **GNU AGPL-3.0** (see `LICENSE`). It is a
