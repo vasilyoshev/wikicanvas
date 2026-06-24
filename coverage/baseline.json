@@ -1,14 +1,14 @@
 {
   "lines": {
-    "pct": 81.53
+    "pct": 78.07
   },
   "statements": {
-    "pct": 80.04
+    "pct": 76.78
   },
   "functions": {
-    "pct": 78.57
+    "pct": 72.72
   },
   "branches": {
-    "pct": 70.78
+    "pct": 67.23
   }
 }
